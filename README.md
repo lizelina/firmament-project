@@ -4,7 +4,7 @@ Get started using Deepgram's Live Transcription with this Flask demo app.
 
 ## What is Deepgram?
 
-[Deepgram’s](https://deepgram.com/) voice AI platform provides APIs for speech-to-text, text-to-speech, and full speech-to-speech voice agents. Over 200,000+ developers use Deepgram to build voice AI products and features.
+[Deepgram's](https://deepgram.com/) voice AI platform provides APIs for speech-to-text, text-to-speech, and full speech-to-speech voice agents. Over 200,000+ developers use Deepgram to build voice AI products and features.
 
 ## Sign-up to Deepgram
 
@@ -18,7 +18,12 @@ Follow these steps to get started with this starter application.
 
 #### Clone the repository
 
-Go to GitHub and [clone the repository](https://github.com/deepgram-starters/prerecorded-node-starter).
+Go to GitHub and clone the repository:
+
+```bash
+git clone https://github.com/deepgram-starters/live-flask-starter.git
+cd live-flask-starter
+```
 
 #### Install dependencies
 
@@ -32,18 +37,35 @@ pip install -r requirements.txt
 
 Copy the code from `sample.env` and create a new file called `.env`. Paste in the code and enter your API key you generated in the [Deepgram console](https://console.deepgram.com/).
 
-```js
+```
 DEEPGRAM_API_KEY=%api_key%
 ```
 
 #### Run the application
 
-You need to run both app.py (port 8000) and app_socketio.py (port 5001). Once running, you can access the application in your browser at <http://127.0.0.1:8000>
+##### Option 1: Using run_app.bat (Windows)
+
+For Windows users, you can simply double-click or run the `run_app.bat` file to start both servers at once:
 
 ```bash
+run_app.bat
+```
+
+##### Option 2: Manual startup
+
+You need to run both app.py and app_socketio.py in separate terminal windows:
+
+Terminal 1 (Flask server on port 8000):
+```bash
 python app.py
+```
+
+Terminal 2 (SocketIO server on port 5001):
+```bash
 python app_socketio.py
 ```
+
+Once both servers are running, access the application in your browser at http://127.0.0.1:8000
 
 ## Testing
 
