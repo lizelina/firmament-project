@@ -35,10 +35,10 @@ pip install -r requirements.txt
 
 #### Edit the config file
 
-Copy the code from `sample.env` and create a new file called `.env`. Paste in the code and enter your API key you generated in the [Deepgram console](https://console.deepgram.com/).
+This project includes a `sample.env` file with the required configuration structure. Create a new file called `.env` and copy the content from `sample.env`. Then replace `%api_key%` with your actual API key that you generated in the [Deepgram console](https://console.deepgram.com/).
 
 ```
-DEEPGRAM_API_KEY=%api_key%
+DEEPGRAM_API_KEY=your_actual_api_key_here
 ```
 
 #### Run the application
