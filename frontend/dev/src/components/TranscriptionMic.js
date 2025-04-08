@@ -5,7 +5,7 @@ import './TranscriptionMic.css';
 // Set to true to enable detailed console logging
 const DEBUG = true;
 
-const TranscriptionMic = ({ onStatusChange, onTranscriptChange }) => {
+const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId }) => {
   const [recording, setRecording] = useState(false);
   const [connected, setConnected] = useState(false);
   const [deepgramConnected, setDeepgramConnected] = useState(false);
@@ -23,112 +23,140 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange }) => {
 
   // Initialize socket connection
   useEffect(() => {
+    // Check for userId first
+    if (!userId) {
+      debugLog('No userId provided');
+      onStatusChange("No user ID found. Please log in again.");
+      return;
+    }
+
     const socketPort = 5001;
     const socketUrl = `http://localhost:${socketPort}`;
     
-    debugLog('Connecting to socket server:', socketUrl);
+    debugLog('Connecting to socket server:', socketUrl, 'with userId:', userId);
     
-    socketRef.current = io(socketUrl, {
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-      withCredentials: false
-    });
+    if (!socketRef.current) {
+      // Include userId in connection query params
+      socketRef.current = io(socketUrl, {
+        query: { userId },
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        pingTimeout: 60000,  // Increased ping timeout (60 seconds)
+        pingInterval: 25000, // Increased ping interval (25 seconds)
+        withCredentials: false
+      });
 
-    // Connection status events
-    socketRef.current.on('connect', () => {
-      debugLog('Connected to socket server');
-      reconnectAttemptsRef.current = 0;
-      setConnected(true);
-      onStatusChange("Socket connected. Click the microphone to start.");
-    });
+      // Connection status events
+      socketRef.current.on('connect', () => {
+        debugLog('Connected to socket server');
+        reconnectAttemptsRef.current = 0;
+        setConnected(true);
+        onStatusChange("Socket connected. Click the microphone to start.");
+      });
 
-    socketRef.current.on('disconnect', () => {
-      debugLog('Disconnected from socket server');
-      setConnected(false);
-      setDeepgramConnected(false);
-      onStatusChange("Socket disconnected. Attempting to reconnect...");
-      
-      if (recording) {
-        stopRecording(true);
-      }
-    });
+      socketRef.current.on('disconnect', () => {
+        debugLog('Disconnected from socket server');
+        setConnected(false);
+        setDeepgramConnected(false);
+        onStatusChange("Socket disconnected. Attempting to reconnect...");
+        
+        if (recording) {
+          stopRecording(true);
+        }
+      });
 
-    socketRef.current.on('connect_error', (error) => {
-      console.error('Connection error:', error);
-      reconnectAttemptsRef.current++;
-      onStatusChange(`Error connecting to server: ${error.message}. Attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`);
-      
-      if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
-        onStatusChange("Could not connect to server. Please refresh the page to try again.");
-      }
-    });
+      socketRef.current.on('connect_error', (error) => {
+        console.error('Connection error:', error);
+        reconnectAttemptsRef.current++;
+        onStatusChange(`Error connecting to server: ${error.message}. Attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`);
+        
+        if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          onStatusChange("Could not connect to server. Please refresh the page to try again.");
+        }
+      });
 
-    socketRef.current.on('reconnect', (attemptNumber) => {
-      debugLog(`Reconnected on attempt ${attemptNumber}`);
-      onStatusChange("Reconnected to server. Click the microphone to start again.");
-    });
+      socketRef.current.on('reconnect', (attemptNumber) => {
+        debugLog(`Reconnected on attempt ${attemptNumber}`);
+        onStatusChange("Reconnected to server. Click the microphone to start again.");
+      });
 
-    // Deepgram event listeners
-    socketRef.current.on('deepgram_ready', (data) => {
-      debugLog('Deepgram connection ready:', data);
-      setDeepgramConnected(true);
-      onStatusChange("Listening... Speak now");
-    });
+      // Deepgram event listeners
+      socketRef.current.on('deepgram_ready', (data) => {
+        debugLog('Deepgram connection ready:', data);
+        setDeepgramConnected(true);
+        onStatusChange("Listening... Speak now");
+      });
 
-    socketRef.current.on('deepgram_stopped', (data) => {
-      debugLog('Deepgram stopped:', data);
-      setDeepgramConnected(false);
-      
-      if (recording) {
-        stopRecording(true);
-      }
-      
-      onStatusChange("Transcription stopped");
-    });
+      socketRef.current.on('deepgram_stopped', (data) => {
+        debugLog('Deepgram stopped:', data);
+        setDeepgramConnected(false);
+        
+        if (recording) {
+          stopRecording(true);
+        }
+        
+        onStatusChange("Transcription stopped");
+      });
 
-    socketRef.current.on('deepgram_disconnected', (data) => {
-      debugLog('Deepgram disconnected:', data);
-      setDeepgramConnected(false);
-      if (recording) {
-        stopRecording(true);
-        onStatusChange("Deepgram disconnected. Please try again.");
-      }
-    });
+      socketRef.current.on('deepgram_disconnected', (data) => {
+        debugLog('Deepgram disconnected:', data);
+        setDeepgramConnected(false);
+        if (recording) {
+          stopRecording(true);
+          onStatusChange("Deepgram disconnected. Please try again.");
+        }
+      });
 
-    socketRef.current.on('deepgram_error', (data) => {
-      console.error('Deepgram error:', data);
-      onStatusChange("Error with speech service: " + data.error);
-    });
+      socketRef.current.on('deepgram_error', (data) => {
+        console.error('Deepgram error:', data);
+        onStatusChange("Error with speech service: " + data.error);
+      });
 
-    socketRef.current.on('connection_lost', (data) => {
-      console.error('Connection lost:', data);
-      setDeepgramConnected(false);
-      onStatusChange(data.message);
-      
-      if (recording) {
-        stopRecording(true);
-      }
-    });
+      socketRef.current.on('connection_lost', (data) => {
+        console.error('Connection lost:', data);
+        setDeepgramConnected(false);
+        onStatusChange(data.message);
+        
+        if (recording) {
+          stopRecording(true);
+        }
+      });
 
-    socketRef.current.on('connection_error', (data) => {
-      console.error('Connection error:', data);
-      onStatusChange(data.message);
-    });
+      socketRef.current.on('connection_error', (data) => {
+        console.error('Connection error:', data);
+        onStatusChange(data.message);
+      });
 
-    socketRef.current.on("transcription_update", (data) => {
-      debugLog("Received transcription:", data.transcription);
-      onTranscriptChange(data.transcription);
-    });
+      socketRef.current.on("transcription_update", (data) => {
+        debugLog("Received transcription:", data.transcription);
+        onTranscriptChange(data.transcription);
+      });
+    }
 
     return () => {
+      // We do not disconnect on unmount to maintain the socket connection
+      // This way, the connection doesn't drop when component re-renders
+    };
+  }, [onStatusChange, onTranscriptChange, userId]);
+
+  // Add event listener for page unload to clean up socket
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // When page is actually closing, disconnect the socket
       if (socketRef.current) {
+        debugLog('Page closing, disconnecting socket');
         socketRef.current.disconnect();
       }
     };
-  }, [onStatusChange, onTranscriptChange]);
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   // Get microphone access
   const getMicrophone = async () => {
@@ -203,7 +231,12 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange }) => {
           }
           
           const arrayBuffer = await event.data.arrayBuffer();
-          socket.emit("audio_stream", arrayBuffer);
+          
+          // Always include userId with audio data
+          socket.emit("audio_stream", {
+            audio: arrayBuffer,
+            userId: userId
+          });
         }
       };
       
@@ -226,6 +259,11 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange }) => {
 
   // Start recording
   const startRecording = async () => {
+    if (!userId) {
+      onStatusChange("No user ID found. Please log in again.");
+      return;
+    }
+    
     setRecording(true);
     onStatusChange("Initializing microphone...");
     
@@ -238,7 +276,10 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange }) => {
       // Only if socket is connected
       if (socketRef.current && socketRef.current.connected) {
         debugLog("Emitting toggle_transcription start event");
-        socketRef.current.emit("toggle_transcription", { action: "start" });
+        socketRef.current.emit("toggle_transcription", { 
+          action: "start",
+          userId: userId 
+        });
       } else {
         throw new Error("Socket not connected, can't start transcription");
       }
@@ -256,7 +297,10 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange }) => {
       // First, signal the server to stop transcription
       if (!silent && socketRef.current && socketRef.current.connected) {
         debugLog("Sending stop signal to server");
-        socketRef.current.emit("toggle_transcription", { action: "stop" });
+        socketRef.current.emit("toggle_transcription", { 
+          action: "stop",
+          userId: userId
+        });
       }
       
       // Set recording state to false immediately

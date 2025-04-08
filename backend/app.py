@@ -3,7 +3,8 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from flask import Flask, render_template
+from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 
 # Configure logging (similar to app_socketio.py)
 logging.basicConfig(
@@ -21,10 +22,23 @@ load_dotenv()
 def create_app():
     """Application factory function"""
     app = Flask("app_http")
+    CORS(app)  # Enable CORS for all routes
     
     @app.route('/')
     def index():
         return render_template('index.html')
+    
+    @app.route('/login', methods=['POST'])
+    def login():
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        # Static credentials check
+        if username == 'root' and password == '123456':
+            return jsonify({'success': True, 'message': 'Login successful'})
+        else:
+            return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
     
     return app
 

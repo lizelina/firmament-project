@@ -1,102 +1,116 @@
-# Flask Live Transcription Starter
+# Real-time Speech Transcription App
 
-Get started using Deepgram's Live Transcription with this Flask demo app.
+A full-stack application for real-time speech transcription using Deepgram's speech-to-text API. The app features user authentication, persistent sessions, and high-quality transcription.
 
-## What is Deepgram?
+## Features
 
-[Deepgram's](https://deepgram.com/) voice AI platform provides APIs for speech-to-text, text-to-speech, and full speech-to-speech voice agents. Over 200,000+ developers use Deepgram to build voice AI products and features.
+- Real-time speech-to-text transcription
+- User authentication and session management
+- Microphone control with visual feedback
+- Responsive design
+- Persistent user sessions
+- Stable WebSocket connections
 
-## Sign-up to Deepgram
+## Tech Stack
 
-Before you start, it's essential to generate a Deepgram API key to use in this project. [Sign-up now for Deepgram and create an API key](https://console.deepgram.com/signup?jump=keys).
+- **Backend**: Flask, Flask-SocketIO, Deepgram API
+- **Frontend**: React.js
+- **Authentication**: Simple user authentication
 
-## Quickstart
+## Installation
 
-### Manual
+### Prerequisites
 
-Follow these steps to get started with this starter application.
+- Python 3.8+
+- Node.js 14+
+- Deepgram API key
 
-#### Clone the repository
+### Backend Setup
 
-Go to GitHub and clone the repository:
+1. Clone the repository
+2. Set up a Python virtual environment:
+   ```
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+3. Create a `.env` file in the backend directory with your Deepgram API key:
+   ```
+   DEEPGRAM_API_KEY=your_key_here
+   ```
 
-```bash
-git clone https://github.com/deepgram-starters/live-flask-starter.git
-cd live-flask-starter
-```
+### Frontend Setup
 
-#### Install dependencies
+1. Install dependencies:
+   ```
+   cd frontend/dev
+   npm install
+   ```
 
-Install the project dependencies.
+## Running the Application
 
-```bash
-pip install -r requirements.txt
-```
+1. Start the backend servers:
+   ```
+   # Terminal 1 - HTTP Server
+   cd backend
+   python app.py
+   
+   # Terminal 2 - WebSocket Server
+   cd backend
+   python app_socketio.py
+   ```
 
-#### Edit the config file
+2. Start the frontend development server:
+   ```
+   cd frontend/dev
+   npm start
+   ```
 
-This project includes a `sample.env` file with the required configuration structure. Create a new file called `.env` and copy the content from `sample.env`. Then replace `%api_key%` with your actual API key that you generated in the [Deepgram console](https://console.deepgram.com/).
+3. Access the application at http://localhost:3000
 
-```
-DEEPGRAM_API_KEY=your_actual_api_key_here
-```
+## Login Information
 
-#### Run the application
+To access the application, use the following credentials:
 
-##### Option 1: Using run_app.bat (Windows)
+- **Username**: root
+- **Password**: 123456
 
-For Windows users, you can simply double-click or run the `run_app.bat` file to start both servers at once:
+## Usage
 
-```bash
-run_app.bat
-```
+1. Log in with the credentials above
+2. Click the microphone button to start recording
+3. Speak into your microphone to see real-time transcription
+4. Click the microphone button again to stop recording
+5. Use the logout button to end your session
 
-##### Option 2: Manual startup
+## Architecture
 
-You need to run both app.py and app_socketio.py in separate terminal windows:
+The application consists of three main components:
 
-Terminal 1 (Flask server on port 8000):
-```bash
-python app.py
-```
+1. **HTTP Server (app.py)**: Handles authentication and serves static content
+2. **WebSocket Server (app_socketio.py)**: Manages real-time audio streaming and Deepgram integration
+3. **React Frontend**: Provides the user interface for login, audio recording, and transcription display
 
-Terminal 2 (SocketIO server on port 5001):
-```bash
-python app_socketio.py
-```
+## Session Management
 
-Once both servers are running, access the application in your browser at http://127.0.0.1:8000
+The application uses a persistent user ID system to maintain stable connections across page reloads and reconnections. User IDs are:
 
-## Testing
+1. Generated at login time
+2. Stored in localStorage
+3. Sent with each WebSocket connection
+4. Used to track Deepgram connections on the server
 
-To contribute or modify pytest code, install the following dependencies:
+## Troubleshooting
 
-```bash
-pip install -r requirements-dev.txt
-```
+If you encounter issues with transcription:
 
-To run the tests, run the following command:
-
-```bash
-pytest -v -s
-```
-
-## Issue Reporting
-
-If you have found a bug or if you have a feature request, please report them at this repository issues section. Please do not report security vulnerabilities on the public GitHub issue tracker. The [Security Policy](./SECURITY.md) details the procedure for contacting Deepgram.
-
-## Getting Help
-
-We love to hear from you so if you have questions, comments or find a bug in the project, let us know! You can either:
-
-- [Open an issue in this repository](https://github.com/deepgram-starters/live-flask-starter/issues/new)
-- [Join the Deepgram Github Discussions Community](https://github.com/orgs/deepgram/discussions)
-- [Join the Deepgram Discord Community](https://discord.gg/xWRaCDBtW4)
-
-## Author
-
-[Deepgram](https://deepgram.com)
+1. Check browser microphone permissions
+2. Ensure your Deepgram API key is valid
+3. Verify both backend servers are running
+4. Check the browser console for errors
+5. Examine the server logs for WebSocket or Deepgram errors
 
 ## License
 
-This project is licensed under the MIT license. See the [LICENSE](./LICENSE) file for more info.
+This project is licensed under the MIT License - see the LICENSE file for details.
