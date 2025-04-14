@@ -25,7 +25,23 @@ const generateEphemeralId = (baseUserId) => {
   return `${prefix}${randomPart}${timestampPart}`;
 };
 
-const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId }) => {
+// Format current date and time
+const formatDateTime = () => {
+  const now = new Date();
+  const date = now.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  const time = now.toLocaleTimeString('en-US', { 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    hour12: true 
+  });
+  return { date, time };
+};
+
+const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onCompleteTranscript }) => {
   const [recording, setRecording] = useState(false);
   const [connected, setConnected] = useState(false);
   const [deepgramConnected, setDeepgramConnected] = useState(false);
@@ -34,6 +50,8 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId }) => {
   const mediaStreamRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const ephemeralUserIdRef = useRef(null); // Store current ephemeral ID
+  const accumulatedTranscriptRef = useRef(''); // Store accumulated transcript
+  const startTimeRef = useRef(null); // Store start time
   const MAX_RECONNECT_ATTEMPTS = 5;
 
   // Helper function for debug logging
@@ -177,8 +195,18 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId }) => {
       });
 
       socket.on("transcription_update", (data) => {
-        debugLog("Received transcription:", data.transcription);
-        onTranscriptChange(data.transcription);
+        if (data.transcription && data.transcription.trim() !== '') {
+          debugLog("Received transcription:", data.transcription);
+          
+          // Append to accumulated transcript
+          const currentTranscript = accumulatedTranscriptRef.current;
+          // Add spacing if needed
+          const spacer = currentTranscript && !currentTranscript.endsWith(' ') ? ' ' : '';
+          accumulatedTranscriptRef.current = currentTranscript + spacer + data.transcription;
+          
+          // Update the display
+          onTranscriptChange(accumulatedTranscriptRef.current);
+        }
       });
 
       // Store socket in ref
@@ -390,6 +418,13 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId }) => {
       onStatusChange("Preparing microphone...");
       await stopAndReleaseMediaResources();
       
+      // Reset accumulated transcript
+      accumulatedTranscriptRef.current = '';
+      onTranscriptChange('');
+      
+      // Save start time
+      startTimeRef.current = new Date();
+      
       // Generate a new ephemeral user ID for this recording session
       const newEphemeralUserId = generateEphemeralId(userId);
       ephemeralUserIdRef.current = newEphemeralUserId;
@@ -455,6 +490,27 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId }) => {
       
       // Set recording state to false immediately
       setRecording(false);
+      
+      // Get end time and format timestamps
+      const endTime = new Date();
+      const { date, time } = formatDateTime();
+      const duration = Math.round((endTime - startTimeRef.current) / 1000); // Duration in seconds
+      
+      // Create the complete transcript with metadata for database storage
+      const completeTranscript = {
+        text: accumulatedTranscriptRef.current,
+        date: endTime.toISOString(), // ISO format for database
+        time: time,
+        title: `Note ${date} ${time}`,
+        duration: duration, // Store as seconds for database
+        durationStr: `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`, // For display
+        userId
+      };
+      
+      // Send complete transcript to parent component if there's content
+      if (onCompleteTranscript && accumulatedTranscriptRef.current.trim() !== '') {
+        onCompleteTranscript(completeTranscript);
+      }
       
       // Stop the recorder and release all media resources
       await stopAndReleaseMediaResources();

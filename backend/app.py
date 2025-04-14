@@ -117,6 +117,42 @@ def create_app():
         else:
             return jsonify({'success': False, 'message': 'User not found'}), 404
     
+    @app.route('/transcripts', methods=['POST'])
+    def save_transcript():
+        """Save a transcript to the database"""
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['userId', 'originalText', 'title']
+        if not all(field in data for field in required_fields):
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+        
+        # Log the request
+        logger.info(f"Saving transcript for user: {data.get('userId')}")
+        
+        # Save to MongoDB
+        result = db.save_transcript(data)
+        
+        if result and result.get('success'):
+            return jsonify(result)
+        else:
+            error_message = result.get('message', 'Failed to save transcript') if result else 'Database error'
+            return jsonify({'success': False, 'message': error_message}), 500
+    
+    @app.route('/transcripts/<user_id>', methods=['GET'])
+    def get_user_transcripts(user_id):
+        """Get all transcripts for a specific user"""
+        logger.info(f"Retrieving transcripts for user: {user_id}")
+        
+        # Get from MongoDB
+        result = db.get_user_transcripts(user_id)
+        
+        if result and result.get('success'):
+            return jsonify(result)
+        else:
+            error_message = result.get('message', 'Failed to retrieve transcripts') if result else 'Database error'
+            return jsonify({'success': False, 'message': error_message}), 500
+    
     return app
 
 # This is used by Gunicorn

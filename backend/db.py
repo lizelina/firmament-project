@@ -3,6 +3,7 @@ import logging
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
+import datetime
 
 # Load environment variables
 load_dotenv()
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # MongoDB connection string
 # Original MongoDB Atlas connection
-# MONGO_URI = os.getenv('MONGO_URI', '')
+# MONGO_URI = os.getenv('MONGO_URI', 'mongodb+srv://root:123qweasd@fimament-a.p9kidca.mongodb.net/')
 # DB_NAME = os.getenv('DB_NAME', 'firmament')
 
 # Local MongoDB connection
@@ -24,6 +25,7 @@ try:
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
     users_collection = db['users']
+    transcriptions_collection = db['transcriptions']
     
     # Test the connection
     client.admin.command('ping')
@@ -34,6 +36,7 @@ except Exception as e:
     client = None
     db = None
     users_collection = None
+    transcriptions_collection = None
 
 def authenticate_user(email, password):
     """
@@ -128,4 +131,97 @@ def create_user(user_data):
         return {'success': False, 'message': 'Failed to create user'}
     except Exception as e:
         logger.error(f"Error creating user: {e}")
+        return {'success': False, 'message': f'Database error: {str(e)}'}
+
+def save_transcript(transcript_data):
+    """
+    Save a transcript to the database
+    
+    Expected format:
+    {
+        "userId": "64f7a6cfa623d0a1b2c3d4e5",
+        "title": "Note April 13, 2023 08:30 AM",
+        "originalText": "Good morning team...",
+        "date": "2023-04-13T08:30:00", (ISO string)
+        "duration": 450 (in seconds)
+    }
+    """
+    if transcriptions_collection is None:
+        logger.error("MongoDB connection not available")
+        return {'success': False, 'message': 'Database not available'}
+    
+    try:
+        # Create a copy of the data to avoid modifying the original
+        data_to_save = transcript_data.copy()
+        
+        # Add timestamps
+        now = datetime.datetime.utcnow()
+        data_to_save['createdAt'] = now
+        data_to_save['updatedAt'] = now
+        
+        # Convert userId string to ObjectId if provided
+        if 'userId' in data_to_save and data_to_save['userId']:
+            try:
+                data_to_save['userId'] = ObjectId(data_to_save['userId'])
+            except Exception as e:
+                logger.warning(f"Invalid userId format: {e}")
+                # Keep as string if conversion fails
+        
+        # Insert the transcript
+        result = transcriptions_collection.insert_one(data_to_save)
+        
+        if result.inserted_id:
+            # Return success with the ID (converted to string for JSON serialization)
+            return {
+                'success': True, 
+                'transcriptId': str(result.inserted_id),
+                'message': 'Transcript saved successfully'
+            }
+        else:
+            return {'success': False, 'message': 'Failed to save transcript'}
+    except Exception as e:
+        logger.error(f"Error saving transcript: {e}")
+        return {'success': False, 'message': f'Database error: {str(e)}'}
+
+def get_user_transcripts(user_id):
+    """
+    Get all transcripts for a specific user
+    """
+    if transcriptions_collection is None:
+        logger.error("MongoDB connection not available")
+        return {'success': False, 'message': 'Database not available'}
+    
+    try:
+        # Convert string ID to ObjectId
+        object_id = ObjectId(user_id)
+        
+        # Find all transcripts for this user, sorted by date (newest first)
+        transcripts = list(transcriptions_collection.find(
+            {'userId': object_id}
+        ).sort('createdAt', -1))
+        
+        # Convert ObjectId to string for each transcript
+        for transcript in transcripts:
+            # Convert _id to string
+            if '_id' in transcript:
+                transcript['_id'] = str(transcript['_id'])
+            
+            # Convert userId to string if it's an ObjectId
+            if 'userId' in transcript and isinstance(transcript['userId'], ObjectId):
+                transcript['userId'] = str(transcript['userId'])
+                
+            # Convert createdAt and updatedAt to ISO strings
+            if 'createdAt' in transcript and transcript['createdAt']:
+                transcript['createdAt'] = transcript['createdAt'].isoformat()
+            if 'updatedAt' in transcript and transcript['updatedAt']:
+                transcript['updatedAt'] = transcript['updatedAt'].isoformat()
+            
+            # Ensure any other potential ObjectId fields are converted to strings
+            for key, value in transcript.items():
+                if isinstance(value, ObjectId):
+                    transcript[key] = str(value)
+        
+        return {'success': True, 'transcripts': transcripts}
+    except Exception as e:
+        logger.error(f"Error getting user transcripts: {e}")
         return {'success': False, 'message': f'Database error: {str(e)}'} 

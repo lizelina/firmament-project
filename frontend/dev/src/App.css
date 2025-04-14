@@ -1,15 +1,124 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap");
 
 .App {
-  text-align: center;
-  font-family: "Inter", sans-serif;
-  background-color: #000;
-  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
+  background-color: #f5f7fa;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
+  padding: 15px 30px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.header-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-title h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+}
+
+.user-info {
+  font-size: 14px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.logout-button {
+  background-color: #f1f1f1;
+  color: #555;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.logout-button:hover {
+  background-color: #e1e1e1;
+}
+
+.app-content {
+  flex: 1;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Saving indicator */
+.saving-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: rgba(0, 0, 0, 0.8);
   color: white;
+  padding: 10px 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  font-size: 14px;
+  animation: fadeIn 0.3s ease;
+}
+
+.saving-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Media queries for responsive design */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 10px 20px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .logout-button {
+    margin-top: 10px;
+  }
+  
+  .app-content {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-title h1 {
+    font-size: 20px;
+  }
+  
+  .app-content {
+    padding: 10px;
+  }
 }
 
 .container {
@@ -89,4 +198,80 @@ h1 {
 
 .logout-button:active {
   transform: scale(0.98);
+}
+
+.completed-transcripts-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 20px auto;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.transcript-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 15px;
+}
+
+.new-transcript-button {
+  background-color: #4a4a4a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.new-transcript-button:hover {
+  background-color: #333;
+}
+
+.transcript-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.transcript-item {
+  background-color: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.transcript-header {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.transcript-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.transcript-metadata {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #777;
+}
+
+.transcript-text {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333;
+  white-space: pre-wrap;
+}
+
+.no-transcripts {
+  text-align: center;
+  padding: 20px;
+  color: #777;
+  font-style: italic;
 }
