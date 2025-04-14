@@ -6,8 +6,8 @@ const generateUserId = () => {
   return 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
 };
 
-const Login = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState('');
+const Login = ({ onLoginSuccess, onSwitchToRegister }) => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,28 +23,36 @@ const Login = ({ onLoginSuccess }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        setError('Server error. Please try again.');
+        return;
+      }
 
       if (response.ok) {
-        // Store auth state in localStorage for persistence
+        // Store auth state and user info in localStorage for persistence
         localStorage.setItem('isAuthenticated', 'true');
         
-        // Handle userId persistence
-        let userId = localStorage.getItem('userId');
-        
-        // If no userId exists, generate one
-        if (!userId) {
-          // In a real app, you'd typically get this from the server
-          // For now, we'll generate one client-side
-          userId = generateUserId();
-          localStorage.setItem('userId', userId);
+        // Store user data
+        if (data.user) {
+          localStorage.setItem('userId', data.user.id);
+          localStorage.setItem('userFirstName', data.user.firstName);
+          localStorage.setItem('userLastName', data.user.lastName);
+          localStorage.setItem('userEmail', data.user.email);
+        } else {
+          // Fallback to generated ID if no user data
+          const generatedId = generateUserId();
+          localStorage.setItem('userId', generatedId);
         }
         
         // Call the callback to update parent component state
-        onLoginSuccess(userId);
+        onLoginSuccess(localStorage.getItem('userId'));
       } else {
         setError(data.message || 'Login failed');
       }
@@ -64,13 +72,15 @@ const Login = ({ onLoginSuccess }) => {
           {error && <div className="error-message">{error}</div>}
           
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="email">Email</label>
             <input
-              type="text"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
+              placeholder="Enter your email"
+              autoComplete="email"
             />
           </div>
           
@@ -82,6 +92,8 @@ const Login = ({ onLoginSuccess }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              placeholder="Enter your password"
+              autoComplete="current-password"
             />
           </div>
           
@@ -92,6 +104,11 @@ const Login = ({ onLoginSuccess }) => {
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
+          
+          <div className="login-help">
+            <p>Demo account: john.doe@example.com / 123456</p>
+            <p>Don't have an account? <a href="#" onClick={(e) => { e.preventDefault(); onSwitchToRegister(); }}>Register</a></p>
+          </div>
         </form>
       </div>
     </div>
