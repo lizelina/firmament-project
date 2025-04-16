@@ -44,7 +44,8 @@ socketio = SocketIO(
     async_mode='threading'  # Use threading mode for better stability
 )
 
-API_KEY = os.getenv("DEEPGRAM_API_KEY")
+# API_KEY = os.getenv("DEEPGRAM_API_KEY")
+API_KEY = 'b022e2d65f01263e0398dd5fd4a0e0026bed6fb0'
 
 # Set up client configuration with better timeout handling
 config = DeepgramClientOptions(
