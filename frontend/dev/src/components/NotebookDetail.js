@@ -9,11 +9,11 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 const NotebookDetail = ({ 
-  transcript, 
+  notebook, 
   userId, 
-  onSaveTranscript, 
+  onSaveNotebook, 
   onBackToList, 
-  isNewTranscription = false 
+  isNewNotebook = false 
 }) => {
   // Track both the current recording state and whether we ever had text
   const [isRecording, setIsRecording] = useState(false);
@@ -21,7 +21,7 @@ const NotebookDetail = ({
   const [transcriptText, setTranscriptText] = useState('');
   const [hasTranscript, setHasTranscript] = useState(false);
   const [status, setStatus] = useState('');
-  const [title, setTitle] = useState(isNewTranscription ? 'New Note' : transcript?.title || 'Untitled');
+  const [title, setTitle] = useState(isNewNotebook ? 'New Note' : notebook?.title || 'Untitled');
   const [activeTab, setActiveTab] = useState('transcript'); // 'transcript' or 'summary'
   
   // Flag to track if a transcript was just saved (to prevent double saves)
@@ -46,14 +46,14 @@ const NotebookDetail = ({
   
   // Set initial note and transcript content if viewing an existing one
   useEffect(() => {
-    if (!isNewTranscription && transcript) {
-      const initialText = transcript?.noteText || transcript?.originalText || transcript?.text || '';
-      const initialTranscript = transcript?.curTranscript || '';
+    if (!isNewNotebook && notebook) {
+      const initialText = notebook?.noteText || notebook?.originalText || notebook?.text || '';
+      const initialTranscript = notebook?.curTranscript || '';
       
       setNoteText(initialText);
       setTranscriptText(initialTranscript);
-      setTitle(transcript?.title || 'Untitled');
-      lastSavedNoteId.current = transcript?._id || null;
+      setTitle(notebook?.title || 'Untitled');
+      lastSavedNoteId.current = notebook?._id || null;
       
       // If there's transcript text, mark that we have a transcript
       if (initialTranscript && initialTranscript.trim() !== '') {
@@ -61,21 +61,21 @@ const NotebookDetail = ({
       }
       
       // Load existing summary and keywords if available
-      if (transcript?.curSummary) {
+      if (notebook?.curSummary) {
         try {
-          const summaryData = JSON.parse(transcript.curSummary);
+          const summaryData = JSON.parse(notebook.curSummary);
           setSummaryText(summaryData.summary || '');
           setKeywords(summaryData.keywords || []);
         } catch (e) {
           // If it's not JSON, treat it as just summary text
-          setSummaryText(transcript.curSummary);
+          setSummaryText(notebook.curSummary);
         }
       }
       
       // Always start in transcript tab when viewing a notebook
       setActiveTab('transcript');
     }
-  }, [transcript, isNewTranscription]);
+  }, [notebook, isNewNotebook]);
 
   // Reset to transcript tab when recording state changes
   useEffect(() => {
@@ -100,13 +100,13 @@ const NotebookDetail = ({
           text: noteText,
           curTranscript: transcriptText,
           curSummary: '', // Clear summary
-          date: transcript?.date || new Date().toISOString(),
-          duration: transcript?.duration || 0
+          date: notebook?.date || new Date().toISOString(),
+          duration: notebook?.duration || 0
         };
         
         // Update the note in the database with empty summary
         console.log("🧹 [NotebookDetail] Clearing summary in database");
-        onSaveTranscript(notebookData, null, true);
+        onSaveNotebook(notebookData, null, true);
       }
       
       // Set start time when recording begins
@@ -198,22 +198,22 @@ const NotebookDetail = ({
       // Prepare data for saving
       const notebookData = {
         userId: userId,
-        noteId: lastSavedNoteId.current || transcript?._id || null,
+        noteId: lastSavedNoteId.current || notebook?._id || null,
         title: title,
         noteText: noteText,
         originalText: noteText,
         text: noteText,
         curTranscript: transcriptText,
         curSummary: JSON.stringify(summaryPayload),
-        date: transcript?.date || new Date().toISOString(),
-        duration: transcript?.duration || 0
+        date: notebook?.date || new Date().toISOString(),
+        duration: notebook?.duration || 0
       };
       
       // Automatically save the summary data
       if (notebookData.noteId) {
         console.log("Automatically saving summary and keywords");
         setStatus("Saving summary...");
-        onSaveTranscript(notebookData, null, true).then(noteId => {
+        onSaveNotebook(notebookData, null, true).then(noteId => {
           if (noteId) {
             lastSavedNoteId.current = noteId;
             setStatus("Summary saved");
@@ -306,7 +306,7 @@ const NotebookDetail = ({
     // When complete transcript is ready, prepare data for saving
     const notebookData = {
       userId: userId,
-      noteId: lastSavedNoteId.current || transcript?._id || null,
+      noteId: lastSavedNoteId.current || notebook?._id || null,
       title: title || `Note ${new Date().toLocaleDateString()}`,
       noteText: noteText || '',
       originalText: noteText || '', // For compatibility 
@@ -330,7 +330,7 @@ const NotebookDetail = ({
     setStatus("Saving transcript...");
     
     // Send to parent component to save (without alert message)
-    onSaveTranscript(notebookData, null, shouldStayOnPage).then(noteId => {
+    onSaveNotebook(notebookData, null, shouldStayOnPage).then(noteId => {
       if (noteId) {
         lastSavedNoteId.current = noteId;
         setStatus("Transcript saved");
@@ -376,12 +376,12 @@ const NotebookDetail = ({
     
     // Don't save if title is empty, revert to previous or default title
     if (!title.trim()) {
-      setTitle(transcript?.title || 'Untitled');
+      setTitle(notebook?.title || 'Untitled');
       return;
     }
     
     // If we don't have a note ID yet or title hasn't changed, don't save
-    if (!lastSavedNoteId.current || title === transcript?.title) {
+    if (!lastSavedNoteId.current || title === notebook?.title) {
       return;
     }
     
@@ -393,9 +393,9 @@ const NotebookDetail = ({
       // Keep other fields the same
       noteText: noteText,
       curTranscript: transcriptText || '',
-      curSummary: transcript?.curSummary || '',
-      date: transcript?.date || new Date().toISOString(),
-      duration: transcript?.duration || 0
+      curSummary: notebook?.curSummary || '',
+      date: notebook?.date || new Date().toISOString(),
+      duration: notebook?.duration || 0
     };
     
     // Show saving status
@@ -403,7 +403,7 @@ const NotebookDetail = ({
     
     // Auto-save the title change
     try {
-      await onSaveTranscript(notebookData, null, true);
+      await onSaveNotebook(notebookData, null, true);
       setStatus("Title saved");
       setTimeout(() => setStatus(""), 2000);
     } catch (error) {
@@ -423,7 +423,7 @@ const NotebookDetail = ({
     // Cancel on Escape key
     if (e.key === 'Escape') {
       e.preventDefault();
-      setTitle(transcript?.title || 'Untitled');
+      setTitle(notebook?.title || 'Untitled');
       setIsEditingTitle(false);
     }
   };
@@ -432,7 +432,7 @@ const NotebookDetail = ({
   const calculateCurrentDuration = () => {
     if (!recordingStartTimeRef.current) {
       // Use existing duration if available
-      return transcript?.duration || 0;
+      return notebook?.duration || 0;
     }
     
     // Calculate elapsed time since recording started
@@ -467,7 +467,7 @@ const NotebookDetail = ({
       // Directly proceed to saving without additional confirmations
       const notebookData = {
         userId: userId,
-        noteId: lastSavedNoteId.current || transcript?._id || null,
+        noteId: lastSavedNoteId.current || notebook?._id || null,
         title: title || `Note ${new Date().toLocaleDateString()}`,
         noteText: noteText,
         originalText: noteText, // For compatibility
@@ -492,7 +492,7 @@ const NotebookDetail = ({
       
       try {
         // Force stayOnPage to be false to ensure navigation
-        const noteId = await onSaveTranscript(notebookData, null, false);
+        const noteId = await onSaveNotebook(notebookData, null, false);
         
         if (noteId) {
           lastSavedNoteId.current = noteId;
@@ -523,7 +523,7 @@ const NotebookDetail = ({
     // Save the current note without new transcription
     const notebookData = {
       userId: userId,
-      noteId: lastSavedNoteId.current || transcript?._id || null,
+      noteId: lastSavedNoteId.current || notebook?._id || null,
       title: title || `Note ${new Date().toLocaleDateString()}`,
       noteText: noteText,
       originalText: noteText, // For compatibility
@@ -534,7 +534,7 @@ const NotebookDetail = ({
         keywords: keywords || []
       }) : '',
       date: new Date().toISOString(),
-      duration: transcript?.duration || 0 // No duration for manual save
+      duration: notebook?.duration || 0 // No duration for manual save
     };
     
     if (!userId) {
@@ -551,7 +551,7 @@ const NotebookDetail = ({
     
     try {
       // Force stayOnPage to be false to ensure navigation
-      const noteId = await onSaveTranscript(notebookData, null, false);
+      const noteId = await onSaveNotebook(notebookData, null, false);
       if (noteId) {
         lastSavedNoteId.current = noteId;
       }

@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import './NotebookList.css';
 
 const NotebookList = ({ 
-  transcripts: notebooks, 
-  onStartNewTranscription: onStartNewNotebook, 
-  onViewTranscript: onViewNotebook,
+  notebooks, 
+  onStartNewNotebook, 
+  onViewNotebook,
   onDeleteNotebook 
 }) => {
   // State to track deletion in progress

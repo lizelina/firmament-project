@@ -312,9 +312,9 @@ function App() {
         {/* List View */}
         {currentView === 'list' && (
           <NotebookList 
-            transcripts={notebooks}
-            onStartNewTranscription={handleStartNewNotebook}
-            onViewTranscript={handleViewNotebook}
+            notebooks={notebooks}
+            onStartNewNotebook={handleStartNewNotebook}
+            onViewNotebook={handleViewNotebook}
             onDeleteNotebook={handleDeleteNotebook}
           />
         )}
@@ -323,9 +323,9 @@ function App() {
         {currentView === 'new' && (
           <div>
             <NotebookDetail
-              isNewTranscription={true}
+              isNewNotebook={true}
               userId={userId}
-              onSaveTranscript={handleSaveNotebook}
+              onSaveNotebook={handleSaveNotebook}
               onBackToList={handleBackToList}
             />
           </div>
@@ -334,9 +334,9 @@ function App() {
         {/* View Existing Notebook */}
         {currentView === 'view' && selectedNotebook && (
           <NotebookDetail
-            transcript={selectedNotebook}
+            notebook={selectedNotebook}
             userId={userId}
-            onSaveTranscript={handleSaveNotebook}
+            onSaveNotebook={handleSaveNotebook}
             onBackToList={handleBackToList}
           />
         )}
