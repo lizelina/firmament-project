@@ -62,7 +62,7 @@ const NotebookDetail = ({
   const STATUS_TIMEOUT = 2000;
 
   // Unified entrance to save the notebook
-  const saveNotebook = async (context = '') => {
+  const saveNotebook = async (context = '', overrideValues = {}) => {
     // Don't save if user ID is missing
     if (!userId) {
       console.error("Cannot save note: No userId provided");
@@ -71,19 +71,49 @@ const NotebookDetail = ({
       return null;
     }
     
+    console.log("📝 [NotebookDetail] Saving notebook with context:", context);
+    
+    // Use override values if provided, otherwise use state values
+    // This solves the async state update issue
+    const currentDuration = overrideValues.duration !== undefined ? 
+      overrideValues.duration : 
+      transcriptDuration || notebook?.duration || 0;
+      
+    const currentText = overrideValues.transcriptText !== undefined ?
+      overrideValues.transcriptText :
+      transcriptText || '';
+    
+    const currentNoteText = overrideValues.noteText !== undefined ?
+      overrideValues.noteText :
+      noteText || '';
+      
+    const currentTitle = overrideValues.title !== undefined ?
+      overrideValues.title :
+      title || `Note ${new Date().toLocaleDateString()}`;
+    
+    const currentSummary = overrideValues.summaryText !== undefined ?
+      overrideValues.summaryText :
+      summaryText;
+    
+    const currentKeywords = overrideValues.keywords !== undefined ?
+      overrideValues.keywords :
+      keywords || [];
+      
+    console.log("Duration:", currentDuration);
+
     // Prepare the notebook data
     const notebookData = {
       userId: userId,
       noteId: lastSavedNoteId.current || notebook?._id || null,
-      title: title || `Note ${new Date().toLocaleDateString()}`,
-      noteText: noteText || '',
-      curTranscript: transcriptText || '',
-      curSummary: summaryText ? JSON.stringify({
-        summary: summaryText,
-        keywords: keywords || []
+      title: currentTitle,
+      noteText: currentNoteText,
+      curTranscript: currentText,
+      curSummary: currentSummary ? JSON.stringify({
+        summary: currentSummary,
+        keywords: currentKeywords
       }) : '',
       date: new Date().toISOString(),
-      duration: transcriptDuration || notebook?.duration || 0
+      duration: currentDuration
     };
 
     // Show saving status with context if provided
@@ -174,7 +204,6 @@ const NotebookDetail = ({
       if (recordingStartTimeRef.current) {
         const endTime = new Date();
         const durationSeconds = Math.round((endTime - recordingStartTimeRef.current) / 1000);
-        setTranscriptDuration(durationSeconds);
         console.log(`📊 [NotebookDetail] Recording ended, duration: ${durationSeconds} seconds`);
       }
     }
@@ -242,13 +271,17 @@ const NotebookDetail = ({
         .map(keyword => keyword.trim())
         .filter(keyword => keyword.length > 0);
       
+      // Update state
       setSummaryText(summaryResult);
       setKeywords(keywordsList);
       
-      // Automatically save the summary data
+      // Automatically save the summary data - use direct values instead of state
       if (lastSavedNoteId.current) {
         console.log("Automatically saving summary and keywords");
-        saveNotebook('summary');
+        saveNotebook('summary', {
+          summaryText: summaryResult,
+          keywords: keywordsList
+        });
       }
     } catch (error) {
       console.error('Error generating summary:', error);
@@ -331,18 +364,24 @@ const NotebookDetail = ({
     // Reset recording start time reference
     recordingStartTimeRef.current = null;
     
-    // When complete transcript is ready, update state variables
+    // Calculate duration if not provided
+    const duration = completeTranscript.duration || calculateCurrentDuration() || 0;
+    
+    // Update state variables - but also pass current values to saveNotebook directly
     setTranscriptText(completeTranscript.text || '');
-    setTranscriptDuration(completeTranscript.duration || calculateCurrentDuration() || 0);
+    setTranscriptDuration(duration);
     
     // Log the duration being saved
-    console.log(`📊 [NotebookDetail] Saving transcript with duration: ${completeTranscript.duration || calculateCurrentDuration() || 0} seconds`);
+    console.log(`📊 [NotebookDetail] Saving transcript with duration: ${duration} seconds`);
     
     // Mark as recently saved to prevent duplicate saves
     setRecentlySaved(true);
     
-    // Save the notebook with context
-    saveNotebook('transcript');
+    // Save the notebook with context and current values directly
+    saveNotebook('transcript', {
+      transcriptText: completeTranscript.text || '',
+      duration: duration
+    });
   };
 
   const handleNoteChange = (e) => {
@@ -375,21 +414,23 @@ const NotebookDetail = ({
   
   // Handle title save on blur
   const handleTitleBlur = async () => {
-    setIsEditingTitle(false);
-    
     // Don't save if title is empty, revert to previous or default title
     if (!title.trim()) {
       setTitle(notebook?.title || 'Untitled');
+      setIsEditingTitle(false);
       return;
     }
     
     // If we don't have a note ID yet or title hasn't changed, don't save
     if (!lastSavedNoteId.current || title === notebook?.title) {
+      setIsEditingTitle(false);
       return;
     }
     
-    // Save the notebook with title context
-    saveNotebook('title');
+    // Save the notebook with title context and pass the current title value
+    const currentTitle = title;
+    setIsEditingTitle(false);
+    saveNotebook('title', { title: currentTitle });
   };
   
   // Handle keyboard events on title input
@@ -409,11 +450,6 @@ const NotebookDetail = ({
 
   // Calculate current duration in seconds
   const calculateCurrentDuration = () => {
-    if (!recordingStartTimeRef.current) {
-      // Use existing duration if available
-      return notebook?.duration || 0;
-    }
-    
     // Calculate elapsed time since recording started
     const now = new Date();
     const durationSeconds = Math.round((now - recordingStartTimeRef.current) / 1000);
