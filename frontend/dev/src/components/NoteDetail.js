@@ -9,11 +9,11 @@ const NoteDetail = ({
   onBackToList, 
   isNewNote = false
 }) => {
-  const [isRecording, setIsRecording] = useState(false);
+  const [isRecording, setIsRecording] = useState(true);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [noteTitle, setNoteTitle] = useState(isNewNote ? `Note ${new Date().toLocaleString()}` : (note?.title || 'Untitled Note'));
   const [noteText, setNoteText] = useState('');
-  const [status, setStatus] = useState('Ready to record');
+  const [status, setStatus] = useState('Click the microphone to start recording');
   const [showSummaryButton, setShowSummaryButton] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [noteId, setNoteId] = useState(note?._id || null);
@@ -61,8 +61,19 @@ const NoteDetail = ({
     }
   };
 
+  const handleBackToList = async () => {
+    // Save the note before returning to list view
+    await saveNote();
+    // Then navigate back to the list
+    onBackToList();
+  };
+
   const handleManualSave = () => {
     saveNote();
+  };
+
+  const handleMicClick = () => {
+    setIsRecording(!isRecording);
   };
 
   const handleGenerateSummary = () => {
@@ -85,9 +96,10 @@ const NoteDetail = ({
     
     try {
       // Call backend API to save the note
-      const endpoint = noteId 
-        ? `http://localhost:8000/userdata/${noteId}`
-        : 'http://localhost:8000/userdata';
+      // const endpoint = noteId 
+      //  ? `http://localhost:8000/userdata/${noteId}`
+      //  : 'http://localhost:8000/userdata';
+      const endpoint = 'http://localhost:8000/userdata';
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -130,7 +142,7 @@ const NoteDetail = ({
         <div className="note-controls">
           <button 
             className="home-button" 
-            onClick={onBackToList}
+            onClick={handleBackToList}
           >
             Home
           </button>
@@ -145,7 +157,7 @@ const NoteDetail = ({
       </div>
       
       <div className="note-content-layout">
-        {/* Left side: Note editor */}
+        {/* Left side: Note editor - now 70% */}
         <div className="note-editor-section">
           <textarea
             className="note-text-editor"
@@ -155,27 +167,8 @@ const NoteDetail = ({
           />
         </div>
         
-        {/* Right side: Transcription */}
+        {/* Right side: Transcription - now 30% */}
         <div className="transcription-section">
-          <div className="transcription-header">
-            <h3>Voice Transcription</h3>
-            <div className="transcription-toggle">
-              <button 
-                className={`mic-button ${isRecording ? 'recording' : ''}`}
-                onClick={() => {
-                  if (!isRecording) {
-                    setIsRecording(true);
-                  }
-                }}
-                disabled={isRecording}
-              >
-                🎤
-              </button>
-              <span className="toggle-status">
-                {isRecording ? 'Recording...' : 'Start Recording'}
-              </span>
-            </div>
-          </div>
           
           <div className="status-message">{status}</div>
           

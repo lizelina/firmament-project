@@ -250,7 +250,7 @@ input:checked + .slider:before {
   cursor: not-allowed;
 }
 
-/* Layout for split view */
+/* Layout for split view - adjust to 70/30 ratio */
 .note-content-layout {
   display: flex;
   gap: 20px;
@@ -258,9 +258,9 @@ input:checked + .slider:before {
   min-height: 500px;
 }
 
-/* Note editor section (left side) */
+/* Note editor section (left side) - now 70% */
 .note-editor-section {
-  flex: 1;
+  flex: 7; /* Changed from flex: 1 to flex: 7 for 70% ratio */
   display: flex;
   flex-direction: column;
 }
@@ -283,9 +283,9 @@ input:checked + .slider:before {
   border-color: #4a90e2;
 }
 
-/* Transcription section (right side) */
+/* Transcription section (right side) - now 30% */
 .transcription-section {
-  flex: 1;
+  flex: 3; /* Changed from flex: 1 to flex: 3 for 30% ratio */
   display: flex;
   flex-direction: column;
   background-color: #f8f9fa;
@@ -293,6 +293,7 @@ input:checked + .slider:before {
   padding: 20px;
 }
 
+/* Simplified transcription header */
 .transcription-header {
   display: flex;
   justify-content: space-between;
@@ -306,28 +307,25 @@ input:checked + .slider:before {
   color: #333;
 }
 
-.transcription-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
+/* Enhanced mic button styling for better visibility */
 .mic-button {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background-color: white;
   border: 1px solid #ddd;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 24px;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 .mic-button:hover {
   background-color: #f0f0f0;
+  transform: scale(1.05);
 }
 
 .mic-button.recording {

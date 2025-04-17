@@ -129,8 +129,7 @@ function App() {
   };
 
   const handleSaveNote = async (noteData) => {
-    // Only save if there's actual content
-    if (!noteData.title || !noteData.noteText) {
+    if (!noteData.title) {
       return;
     }
     
@@ -187,7 +186,7 @@ function App() {
     <div className="App">
       <div className="app-header">
         <div className="header-title">
-          <h1>Smart Notes</h1>
+          <h1>My Note App</h1>
           {userInfo && (
             <div className="user-info">
               Welcome, {userInfo.firstName} {userInfo.lastName}

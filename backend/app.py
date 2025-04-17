@@ -131,7 +131,7 @@ def create_app():
         logger.info(f"Saving user data for user: {data.get('userId')}")
         
         # Save to MongoDB
-        result = db.insert_note(data)
+        result = db.insert_or_update_note(data)
         
         if result and result.get('success'):
             return jsonify(result)
