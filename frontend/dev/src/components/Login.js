@@ -106,7 +106,7 @@ const Login = ({ onLoginSuccess, onSwitchToRegister }) => {
           </button>
           
           <div className="login-help">
-            <p>Demo account: john.doe@example.com / 123456</p>
+            <p>Demo account: a@firmament / 123456</p>
             <p>Don't have an account? <a href="#" onClick={(e) => { e.preventDefault(); onSwitchToRegister(); }}>Register</a></p>
           </div>
         </form>
