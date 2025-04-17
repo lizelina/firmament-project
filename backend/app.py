@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import datetime
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify
@@ -122,23 +123,70 @@ def create_app():
         """Save user data to the database"""
         data = request.get_json()
         
-        # Validate required fields
-        required_fields = ['userId', 'noteId', 'title', 'noteText', 'curTranscript', 'curSummary']
-        if not all(field in data for field in required_fields):
-            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+        # Validate required fields - only userId is truly required
+        if 'userId' not in data:
+            return jsonify({'success': False, 'message': 'Missing required userId field'}), 400
+        
+        # Set default values for missing fields to allow more flexibility
+        if 'noteId' not in data:
+            data['noteId'] = None
+        if 'title' not in data:
+            data['title'] = f'Note {datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}'
+        if 'noteText' not in data:
+            data['noteText'] = data.get('originalText', '') or data.get('text', '')
+        if 'curTranscript' not in data:
+            data['curTranscript'] = ''
+        if 'curSummary' not in data:
+            data['curSummary'] = ''
+        
+        # Extract collection name if specified (default to userdata)
+        collection = data.pop('collection', 'userdata')
         
         # Log the request
-        logger.info(f"Saving user data for user: {data.get('userId')}")
+        logger.info(f"Saving user data for user: {data.get('userId')} to collection: {collection}")
         
         # Save to MongoDB
-        result = db.insert_note(data)
+        result = db.insert_or_update_note(data, collection)
         
         if result and result.get('success'):
             return jsonify(result)
         else:
             error_message = result.get('message', 'Failed to save user data') if result else 'Database error'
             return jsonify({'success': False, 'message': error_message}), 500
+    
+    @app.route('/notebooks', methods=['POST'])
+    def save_notebook():
+        """Save notebook data to the notebooks collection"""
+        data = request.get_json()
         
+        # Validate required fields - only userId is truly required
+        if 'userId' not in data:
+            return jsonify({'success': False, 'message': 'Missing required userId field'}), 400
+        
+        # Set default values for missing fields to allow more flexibility
+        if 'noteId' not in data:
+            data['noteId'] = None
+        if 'title' not in data:
+            data['title'] = f'Note {datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}'
+        if 'noteText' not in data:
+            data['noteText'] = data.get('originalText', '') or data.get('text', '')
+        if 'curTranscript' not in data:
+            data['curTranscript'] = ''
+        if 'curSummary' not in data:
+            data['curSummary'] = ''
+        
+        # Log the request
+        logger.info(f"Saving notebook for user: {data.get('userId')}")
+        
+        # Save to MongoDB notebooks collection
+        result = db.insert_or_update_note(data, 'notebooks')
+        
+        if result and result.get('success'):
+            return jsonify(result)
+        else:
+            error_message = result.get('message', 'Failed to save notebook') if result else 'Database error'
+            return jsonify({'success': False, 'message': error_message}), 500
+    
     @app.route('/userdata/<user_id>', methods=['GET'])
     def get_user_notes(user_id):
         """Get user data by user ID"""
@@ -153,6 +201,19 @@ def create_app():
             error_message = result.get('message', 'Failed to retrieve user data') if result else 'Database error'
             return jsonify({'success': False, 'message': error_message}), 500
 
+    @app.route('/notebooks/<user_id>', methods=['GET'])
+    def get_user_notebooks(user_id):
+        """Get user notebooks by user ID"""
+        logger.info(f"Retrieving notebooks for user: {user_id}")
+        
+        # Get from MongoDB notebooks collection
+        result = db.get_userdata(user_id, 'notebooks')
+        
+        if result and result.get('success'):
+            return jsonify(result)
+        else:
+            error_message = result.get('message', 'Failed to retrieve notebooks') if result else 'Database error'
+            return jsonify({'success': False, 'message': error_message}), 500
 
     # LEGACY
     @app.route('/transcripts', methods=['POST'])

@@ -3,20 +3,23 @@ import './App.css';
 import TranscriptionMic from './components/TranscriptionMic';
 import Login from './components/Login';
 import Register from './components/Register';
-import TranscriptList from './components/TranscriptList';
-import TranscriptDetail from './components/TranscriptDetail';
+import NotebookList from './components/NotebookList';
+import NotebookDetail from './components/NotebookDetail';
 
 function App() {
+  // Force re-render mechanism
+  const [, forceUpdate] = useState({});
+  
   // Authentication states
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userId, setUserId] = useState(null);
   const [userInfo, setUserInfo] = useState(null);
   const [showLogin, setShowLogin] = useState(true);
   
-  // Transcript states
-  const [transcripts, setTranscripts] = useState([]);
+  // Notebook states
+  const [notebooks, setNotebooks] = useState([]);
   const [currentView, setCurrentView] = useState('list'); // 'list', 'new', 'view'
-  const [selectedTranscript, setSelectedTranscript] = useState(null);
+  const [selectedNotebook, setSelectedNotebook] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   
   // Check if user is already authenticated
@@ -36,22 +39,23 @@ function App() {
         email: localStorage.getItem('userEmail') || ''
       });
 
-      // Fetch transcripts from database
-      fetchUserTranscripts(storedUserId);
+      // Fetch notebooks from database
+      fetchUserNotebooks(storedUserId);
     } else if (authenticated && !storedUserId) {
       // If authenticated but no userId, force logout
       handleLogout();
     }
   }, []);
 
-  // Fetch user transcripts from the server
-  const fetchUserTranscripts = async (userId) => {
+  // Fetch user notebooks from the server
+  const fetchUserNotebooks = async (userId) => {
     try {
-      const response = await fetch(`http://localhost:8000/transcripts/${userId}`);
+      // Fetch from notebooks collection
+      const response = await fetch(`http://localhost:8000/notebooks/${userId}`);
       
       if (!response.ok) {
         // Handle HTTP errors
-        console.error(`Error fetching transcripts: HTTP ${response.status}`);
+        console.error(`Error fetching notebooks: HTTP ${response.status}`);
         return;
       }
       
@@ -63,18 +67,19 @@ function App() {
         console.error('Error parsing response:', parseError);
         return;
       }
-      
-      if (data.success && Array.isArray(data.transcripts)) {
-        setTranscripts(data.transcripts);
+
+      // Update state with notebooks data
+      if (data.success && Array.isArray(data.notes)) {
+        setNotebooks(data.notes);
       } else {
-        console.error('Failed to fetch transcripts:', data.message || 'Unknown error');
+        console.error('Failed to fetch notebooks:', data.message || 'Unknown error');
         // Initialize with empty array if no data
-        setTranscripts([]);
+        setNotebooks([]);
       }
     } catch (error) {
-      console.error('Error fetching transcripts:', error);
+      console.error('Error fetching notebooks:', error);
       // Initialize with empty array on error
-      setTranscripts([]);
+      setNotebooks([]);
     }
   };
 
@@ -89,8 +94,8 @@ function App() {
       email: localStorage.getItem('userEmail') || ''
     });
 
-    // Fetch transcripts from database
-    fetchUserTranscripts(userId);
+    // Fetch notebooks from database
+    fetchUserNotebooks(userId);
   };
 
   const handleLogout = () => {
@@ -106,74 +111,130 @@ function App() {
     setUserId(null);
     setUserInfo(null);
     setShowLogin(true);
-    setTranscripts([]);
+    setNotebooks([]);
     setCurrentView('list');
-    setSelectedTranscript(null);
+    setSelectedNotebook(null);
   };
 
-  const handleStartNewTranscription = () => {
+  const handleStartNewNotebook = () => {
+    console.log("Starting new notebook, current view:", currentView);
+
+    // First update the view state
     setCurrentView('new');
+    
+    // Then force a re-render to ensure the component updates
+    forceUpdate({});
+    
+    console.log("View state updated to 'new'");
   };
 
-  const handleViewTranscript = (transcriptId) => {
-    const transcript = transcripts.find(t => t._id === transcriptId);
-    if (transcript) {
-      setSelectedTranscript(transcript);
+  const handleViewNotebook = (notebookId) => {
+    console.log("View notebook requested for ID:", notebookId);
+    const notebook = notebooks.find(n => n._id === notebookId);
+    
+    if (notebook) {
+      console.log("Found notebook to view:", notebook);
+      setSelectedNotebook(notebook);
       setCurrentView('view');
+    } else {
+      console.error("Notebook not found with ID:", notebookId);
     }
   };
 
   const handleBackToList = () => {
     setCurrentView('list');
-    setSelectedTranscript(null);
+    setSelectedNotebook(null);
   };
 
-  const handleSaveTranscript = async (completeTranscript) => {
-    // Only save if there's actual content
-    if (!completeTranscript.text || completeTranscript.text.trim() === '') {
-      return;
+  const handleSaveNotebook = async (notebookData, successMessage, stayOnPage = false) => {
+    // Only save if there's actual content in either notes or transcript
+    if ((!notebookData.noteText || notebookData.noteText.trim() === '') &&
+        (!notebookData.curTranscript || notebookData.curTranscript.trim() === '')) {
+      console.warn("Nothing to save - both note and transcript are empty");
+      return null;
     }
     
     setIsSaving(true);
     
     try {
-      // Convert the transcript object to MongoDB format
-      const transcriptData = {
+      // Prepare data for API
+      const apiData = {
         userId: userId,
-        title: completeTranscript.title || `Note ${new Date().toLocaleDateString()}`,
-        originalText: completeTranscript.text,
-        date: completeTranscript.date, // Already in ISO format
-        duration: completeTranscript.duration // Already in seconds
+        noteId: notebookData.noteId || null,
+        title: notebookData.title || `Note ${new Date().toLocaleDateString()}`,
+        noteText: notebookData.noteText || '',
+        curTranscript: notebookData.curTranscript || '',
+        curSummary: notebookData.curSummary || '',
+        date: notebookData.date || new Date().toISOString(),
+        duration: notebookData.duration || 0,
+        collection: 'notebooks' // Always use notebooks collection
       };
       
-      // Save to MongoDB
-      const response = await fetch('http://localhost:8000/transcripts', {
+      // Save to MongoDB using the notebooks endpoint
+      const response = await fetch('http://localhost:8000/notebooks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(transcriptData),
+        body: JSON.stringify(apiData),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
       
       const result = await response.json();
       
       if (result.success) {
-        // Fetch latest transcripts after successful save
-        await fetchUserTranscripts(userId);
+        // If save was successful, fetch latest notebooks
+        await fetchUserNotebooks(userId);
         
-        // Add a small delay before navigating back to list
-        setTimeout(() => {
-          setCurrentView('list');
-        }, 500);
+        // Show success message if provided
+        if (successMessage) {
+          alert(successMessage);
+        }
+        
+        if (!stayOnPage) {
+          // Add a small delay before navigating back to list
+          setTimeout(() => {
+            setCurrentView('list');
+          }, 500);
+        } else {
+          // If we're staying on the same page, update the selectedNotebook
+          // to make sure it shows the latest content
+          if (notebookData.noteId) {
+            const updatedNotebook = {
+              ...notebookData,
+              _id: notebookData.noteId,
+              updatedAt: new Date().toISOString()
+            };
+            setSelectedNotebook(updatedNotebook);
+          }
+        }
+        
+        // Return the noteId (either the existing one or the new one from the result)
+        return result.noteId || notebookData.noteId;
       } else {
-        console.error('Error saving transcript:', result.message);
+        console.error('Error saving notebook:', result.message);
+        alert(`Failed to save notebook: ${result.message}`);
+        return null;
       }
     } catch (error) {
-      console.error('Error saving transcript:', error);
+      console.error('Error saving notebook:', error);
+      alert(`Error saving notebook: ${error.message}`);
+      return null;
     } finally {
       setIsSaving(false);
     }
   };
+  
+  // Effect to log when currentView changes
+  useEffect(() => {
+    // Special handling for 'new' view
+    if (currentView === 'new') {
+      // Reset state or prep work for new notebook
+    }
+  }, [currentView]);
   
   // Show login/register page if not authenticated
   if (!isAuthenticated) {
@@ -193,7 +254,7 @@ function App() {
     <div className="App">
       <div className="app-header">
         <div className="header-title">
-          <h1>Captions by Deepgram</h1>
+          <h1>Firmament Notebooks</h1>
           {userInfo && (
             <div className="user-info">
               Welcome, {userInfo.firstName} {userInfo.lastName}
@@ -204,27 +265,33 @@ function App() {
       </div>
 
       <div className="app-content">
+        {/* List View */}
         {currentView === 'list' && (
-          <TranscriptList 
-            transcripts={transcripts}
-            onStartNewTranscription={handleStartNewTranscription}
-            onViewTranscript={handleViewTranscript}
+          <NotebookList 
+            transcripts={notebooks}
+            onStartNewTranscription={handleStartNewNotebook}
+            onViewTranscript={handleViewNotebook}
           />
         )}
         
+        {/* New Notebook View */}
         {currentView === 'new' && (
-          <TranscriptDetail
-            isNewTranscription={true}
-            userId={userId}
-            onSaveTranscript={handleSaveTranscript}
-            onBackToList={handleBackToList}
-          />
+          <div>
+            <NotebookDetail
+              isNewTranscription={true}
+              userId={userId}
+              onSaveTranscript={handleSaveNotebook}
+              onBackToList={handleBackToList}
+            />
+          </div>
         )}
         
-        {currentView === 'view' && selectedTranscript && (
-          <TranscriptDetail
-            transcript={selectedTranscript}
+        {/* View Existing Notebook */}
+        {currentView === 'view' && selectedNotebook && (
+          <NotebookDetail
+            transcript={selectedNotebook}
             userId={userId}
+            onSaveTranscript={handleSaveNotebook}
             onBackToList={handleBackToList}
           />
         )}
@@ -233,7 +300,7 @@ function App() {
       {isSaving && (
         <div className="saving-indicator">
           <div className="saving-spinner"></div>
-          <span>Saving transcript...</span>
+          <span>Saving notebook...</span>
         </div>
       )}
     </div>

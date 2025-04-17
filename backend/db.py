@@ -26,6 +26,7 @@ try:
     db = client[DB_NAME]
     users_collection = db['users']
     userdata_collection = db['userdata']
+    notebooks_collection = db['notebooks']  # Add new notebooks collection
     transcriptions_collection = db['transcriptions'] # LEGACY
     
     # Test the connection
@@ -37,6 +38,8 @@ except Exception as e:
     client = None
     db = None
     users_collection = None
+    userdata_collection = None
+    notebooks_collection = None
     transcriptions_collection = None
 
 def authenticate_user(email, password):
@@ -134,9 +137,10 @@ def create_user(user_data):
         logger.error(f"Error creating user: {e}")
         return {'success': False, 'message': f'Database error: {str(e)}'}
     
-def insert_or_update_note(data):
+def insert_or_update_note(data, collection_name='notebooks'):
     """
-    Insert or update a note trinary (noteText, curTranscript, curSummary) to userdata_collection (= db['userdata']).
+    Insert or update a note trinary (noteText, curTranscript, curSummary) to the specified collection.
+    Default is notebooks_collection (= db['notebooks']).
     Replace legacy save_transcript function.
 
     *data* format:
@@ -151,8 +155,14 @@ def insert_or_update_note(data):
 
     """
 
-    if userdata_collection is None:
-        logger.error("MongoDB connection not available")
+    # Get the appropriate collection
+    if collection_name == 'notebooks':
+        target_collection = notebooks_collection
+    else:
+        target_collection = userdata_collection
+    
+    if target_collection is None:
+        logger.error(f"MongoDB connection not available for collection {collection_name}")
         return {'success': False, 'message': 'Database not available'}
     
     try:
@@ -181,7 +191,7 @@ def insert_or_update_note(data):
                 logger.warning(f"Invalid noteId format: {e}")
                 return {'success': False, 'message': 'Invalid noteId'}
             
-            result = userdata_collection.update_one(
+            result = target_collection.update_one(
                 {'_id': note_object_id},
                 {'$set': data_to_save}
             )
@@ -198,7 +208,7 @@ def insert_or_update_note(data):
         del data_to_save['noteId']
         data_to_save['createdAt'] = now  # Add createdAt timestamp
 
-        result = userdata_collection.insert_one(data_to_save)
+        result = target_collection.insert_one(data_to_save)
         if result.inserted_id:
             # Return success with the ID (converted to string for JSON serialization)
             return {
@@ -213,14 +223,21 @@ def insert_or_update_note(data):
         logger.error(f"Error saving note: {e}")
         return {'success': False, 'message': f'Database error: {str(e)}'}
     
-def get_userdata(user_id):
+def get_userdata(user_id, collection_name='notebooks'):
     """
-    Get all user notes by userId.
+    Get all user notes by userId from the specified collection.
+    Default is notebooks_collection (= db['notebooks']).
     Replace legacy get_user_transcripts function.
     """
 
-    if userdata_collection is None:
-        logger.error("MongoDB connection not available")
+    # Get the appropriate collection
+    if collection_name == 'notebooks':
+        target_collection = notebooks_collection
+    else:
+        target_collection = userdata_collection
+
+    if target_collection is None:
+        logger.error(f"MongoDB connection not available for collection {collection_name}")
         return {'success': False, 'message': 'Database not available'}
     
     try:
@@ -228,7 +245,7 @@ def get_userdata(user_id):
         object_id = ObjectId(user_id)
         
         # Find all notes for this user, sorted by date (newest first)
-        notes = list(userdata_collection.find(
+        notes = list(target_collection.find(
             {'userId': object_id}
         ).sort('updatedAt', -1))
         

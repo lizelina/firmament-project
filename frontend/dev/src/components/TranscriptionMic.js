@@ -2,26 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import './TranscriptionMic.css';
 
-// Set to true to enable detailed console logging
-const DEBUG = true;
-
 // Helper function to generate ephemeral session ID
 const generateEphemeralId = (baseUserId) => {
-  // Use a shorter random part (4 chars)
   const randomPart = Math.random().toString(36).substring(2, 6);
-  
-  // Use abbreviated timestamp (last 6 digits only)
   const timestampPart = Date.now().toString().slice(-6);
   
-  // If base userId exists, use just the first 4 chars
   let prefix = '';
   if (baseUserId) {
-    // Take first 4 characters of baseUserId or the whole thing if it's shorter
     const shortBaseId = baseUserId.length > 4 ? baseUserId.substring(0, 4) : baseUserId;
     prefix = `${shortBaseId}_`;
   }
   
-  // Create a compact session ID
   return `${prefix}${randomPart}${timestampPart}`;
 };
 
@@ -41,7 +32,12 @@ const formatDateTime = () => {
   return { date, time };
 };
 
-const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onCompleteTranscript }) => {
+const TranscriptionMic = ({ 
+  onStatusChange, 
+  onTranscriptChange, 
+  userId, 
+  onCompleteTranscript
+}) => {
   const [recording, setRecording] = useState(false);
   const [connected, setConnected] = useState(false);
   const [deepgramConnected, setDeepgramConnected] = useState(false);
@@ -49,24 +45,26 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
   const microphoneRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
-  const ephemeralUserIdRef = useRef(null); // Store current ephemeral ID
-  const accumulatedTranscriptRef = useRef(''); // Store accumulated transcript
-  const startTimeRef = useRef(null); // Store start time
+  const ephemeralUserIdRef = useRef(null);
+  const accumulatedTranscriptRef = useRef('');
+  const startTimeRef = useRef(null);
   const MAX_RECONNECT_ATTEMPTS = 5;
-
+  
   // Helper function for debug logging
   const debugLog = (...args) => {
-    if (DEBUG) {
-      console.log(...args);
-    }
+    console.log("TranscriptionMic:", ...args);
   };
+
+  // When recording state changes, notify the parent
+  useEffect(() => {
+    debugLog("Recording state is now:", recording);
+  }, [recording]);
 
   // Clean up resources when component unmounts
   useEffect(() => {
     return () => {
       // Clean up socket if it exists
       if (socketRef.current) {
-        debugLog('Component unmounting, cleaning up socket');
         socketRef.current.disconnect();
         socketRef.current = null;
       }
@@ -79,27 +77,45 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
     };
   }, []);
 
+  // Safely update transcript while preserving recording state
+  const updateTranscript = (transcriptText) => {
+    // Only update if there's content
+    if (transcriptText && transcriptText.trim() !== '') {
+      // Append to accumulated transcript
+      const currentTranscript = accumulatedTranscriptRef.current;
+      // Add spacing if needed
+      const spacer = currentTranscript && !currentTranscript.endsWith(' ') ? ' ' : '';
+      const newTranscript = currentTranscript + spacer + transcriptText;
+      
+      // Update our local reference
+      accumulatedTranscriptRef.current = newTranscript;
+      
+      // Send to parent WITH CURRENT RECORDING STATE
+      if (onTranscriptChange) {
+        // IMPORTANT: Always send the current recording state with the transcript
+        debugLog("Sending transcript with recording state:", recording);
+        onTranscriptChange(newTranscript, recording);
+      }
+    }
+  };
+
   // Initialize a fresh socket connection with a new ephemeral ID
   const initializeSocket = (ephemeralUserId) => {
     return new Promise((resolve, reject) => {
       // Ensure we have an ephemeral user ID
       if (!ephemeralUserId) {
-        debugLog('No ephemeral userId provided');
         reject(new Error("No ephemeral userId provided"));
         return;
       }
 
       // Clean up existing socket if any
       if (socketRef.current) {
-        debugLog('Cleaning up existing socket connection');
         socketRef.current.disconnect();
         socketRef.current = null;
       }
 
       const socketPort = 5001;
       const socketUrl = `http://localhost:${socketPort}`;
-      
-      debugLog('Creating new socket connection to:', socketUrl, 'with ephemeral userId:', ephemeralUserId);
       
       const socket = io(socketUrl, {
         query: { userId: ephemeralUserId }, // Use ephemeral ID in query params
@@ -113,7 +129,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
 
       // Connection status events
       socket.on('connect', () => {
-        debugLog('Connected to socket server with ephemeral userId:', ephemeralUserId);
         reconnectAttemptsRef.current = 0;
         setConnected(true);
         onStatusChange("Socket connected. Starting transcription...");
@@ -121,7 +136,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
       });
 
       socket.on('disconnect', () => {
-        debugLog('Disconnected from socket server');
         setConnected(false);
         setDeepgramConnected(false);
         onStatusChange("Socket disconnected. Stopping recording...");
@@ -143,19 +157,16 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
       });
 
       socket.on('reconnect', (attemptNumber) => {
-        debugLog(`Reconnected on attempt ${attemptNumber}`);
         onStatusChange("Reconnected to server. Continuing transcription...");
       });
 
       // Deepgram event listeners
       socket.on('deepgram_ready', (data) => {
-        debugLog('Deepgram connection ready:', data);
         setDeepgramConnected(true);
         onStatusChange("Listening... Speak now");
       });
 
       socket.on('deepgram_stopped', (data) => {
-        debugLog('Deepgram stopped:', data);
         setDeepgramConnected(false);
         
         if (recording) {
@@ -166,7 +177,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
       });
 
       socket.on('deepgram_disconnected', (data) => {
-        debugLog('Deepgram disconnected:', data);
         setDeepgramConnected(false);
         if (recording) {
           stopRecording(true);
@@ -194,9 +204,12 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
         onStatusChange(data.message);
       });
 
+      // Handle socket transcription updates
       socket.on("transcription_update", (data) => {
         if (data.transcription && data.transcription.trim() !== '') {
-          debugLog("Received transcription:", data.transcription);
+          // IMPORTANT: Always update the transcript, regardless of recording state
+          // This ensures we don't miss any data from the speech service
+          debugLog(`Received transcript update: "${data.transcription}" (recording: ${recording})`);
           
           // Append to accumulated transcript
           const currentTranscript = accumulatedTranscriptRef.current;
@@ -204,8 +217,10 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
           const spacer = currentTranscript && !currentTranscript.endsWith(' ') ? ' ' : '';
           accumulatedTranscriptRef.current = currentTranscript + spacer + data.transcription;
           
-          // Update the display
-          onTranscriptChange(accumulatedTranscriptRef.current);
+          // Always update the transcript in the parent, regardless of recording state
+          if (onTranscriptChange) {
+            onTranscriptChange(accumulatedTranscriptRef.current, recording);
+          }
         }
       });
 
@@ -215,7 +230,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
       // Set a connection timeout
       const connectionTimeout = setTimeout(() => {
         if (!socket.connected) {
-          debugLog('Socket connection timed out');
           reject(new Error("Socket connection timed out"));
         }
       }, 10000); // 10 second timeout
@@ -230,7 +244,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
   // Get microphone access
   const getMicrophone = async () => {
     try {
-      debugLog("Requesting microphone access...");
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           channelCount: 1,       // Mono audio (required by Deepgram)
@@ -239,7 +252,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
           noiseSuppression: true  // Improve audio quality
         } 
       });
-      debugLog("Microphone access granted", stream);
       
       // Store the MediaStream in the ref
       mediaStreamRef.current = stream;
@@ -259,18 +271,10 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
         }
       }
       
-      debugLog("Using MIME type:", mimeType);
-      
       // Create MediaRecorder with optimized settings
       const recorder = new MediaRecorder(stream, { 
         mimeType: mimeType,
         audioBitsPerSecond: 16000  // 16 kbps audio for speech is sufficient
-      });
-      
-      debugLog("MediaRecorder created:", {
-        mimeType: recorder.mimeType,
-        state: recorder.state,
-        audioBitsPerSecond: recorder.audioBitsPerSecond
       });
       
       return recorder;
@@ -286,14 +290,10 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
     return new Promise((resolve) => {
       // If there's no current recorder or it's already inactive, resolve immediately
       if (!microphoneRef.current || microphoneRef.current.state === 'inactive') {
-        debugLog("No active recorder to stop");
-        
         // Still release any stream that might be around
         if (mediaStreamRef.current) {
-          debugLog("Releasing MediaStream tracks");
           mediaStreamRef.current.getTracks().forEach(track => {
             track.stop();
-            debugLog(`Track ${track.id} stopped`);
           });
           mediaStreamRef.current = null;
         }
@@ -301,8 +301,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
         resolve();
         return;
       }
-      
-      debugLog("Stopping active recorder...");
       
       // Set up the onstop handler to release resources after stopping
       const originalOnStop = microphoneRef.current.onstop;
@@ -313,13 +311,10 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
           originalOnStop.call(microphoneRef.current);
         }
         
-        debugLog("Recorder stopped, now releasing MediaStream tracks");
-        
         // Release all tracks
         if (mediaStreamRef.current) {
           mediaStreamRef.current.getTracks().forEach(track => {
             track.stop();
-            debugLog(`Track ${track.id} stopped`);
           });
           mediaStreamRef.current = null;
         }
@@ -355,7 +350,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
   const openMicrophone = async (microphone, socket) => {
     return new Promise((resolve) => {
       microphone.onstart = () => {
-        debugLog("Client: Microphone opened");
         document.body.classList.add("recording");
         resolve();
       };
@@ -368,10 +362,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
           packetCount++;
           totalBytes += event.data.size;
           
-          if (packetCount % 10 === 0) {
-            debugLog(`Audio stats: ${packetCount} packets, ${(totalBytes/1024).toFixed(2)} KB total`);
-          }
-          
           try {
             // Convert Blob to ArrayBuffer
             const arrayBuffer = await event.data.arrayBuffer();
@@ -379,14 +369,10 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
             // Always include the current ephemeral userId with audio data
             const currentEphemeralId = ephemeralUserIdRef.current;
             if (currentEphemeralId) {
-              debugLog(`Sending audio packet: size=${arrayBuffer.byteLength} bytes, ephemeralUserId=${currentEphemeralId}`);
-              
               socket.emit("audio_stream", {
                 audio: arrayBuffer,
                 userId: currentEphemeralId
               });
-            } else {
-              debugLog("No ephemeral userId available, skipping audio packet");
             }
           } catch (error) {
             console.error("Error processing audio data:", error);
@@ -395,7 +381,6 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
       };
       
       microphone.onstop = () => {
-        debugLog("MediaRecorder stopped");
         setRecording(false);
       };
       
@@ -414,13 +399,22 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
   // Start recording
   const startRecording = async () => {
     try {
+      debugLog("Starting recording process");
+      
       // First, ensure any existing recording is fully stopped
       onStatusChange("Preparing microphone...");
       await stopAndReleaseMediaResources();
       
       // Reset accumulated transcript
       accumulatedTranscriptRef.current = '';
-      onTranscriptChange('');
+      
+      // IMPORTANT: Set recording state to true BEFORE starting the recording process
+      setRecording(true);
+      
+      // Notify parent component immediately
+      if (onTranscriptChange) {
+        onTranscriptChange('', true); // true = recording is active
+      }
       
       // Save start time
       startTimeRef.current = new Date();
@@ -428,24 +422,20 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
       // Generate a new ephemeral user ID for this recording session
       const newEphemeralUserId = generateEphemeralId(userId);
       ephemeralUserIdRef.current = newEphemeralUserId;
-      debugLog("Generated new ephemeral userId:", newEphemeralUserId);
       
       // Initialize a fresh socket connection with the new ephemeral ID
       onStatusChange("Connecting to server...");
       await initializeSocket(newEphemeralUserId);
       
-      setRecording(true);
       onStatusChange("Initializing microphone...");
       
       // Get a fresh microphone instance
       microphoneRef.current = await getMicrophone();
-      debugLog("Client: Waiting to open microphone");
       await openMicrophone(microphoneRef.current, socketRef.current);
       onStatusChange("Connecting to Deepgram...");
       
       // Only if socket is connected
       if (socketRef.current && socketRef.current.connected) {
-        debugLog("Emitting toggle_transcription start event with ephemeral userId:", newEphemeralUserId);
         socketRef.current.emit("toggle_transcription", { 
           action: "start",
           userId: newEphemeralUserId
@@ -454,7 +444,14 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
         throw new Error("Socket not connected, can't start transcription");
       }
     } catch (error) {
+      debugLog("Error starting recording:", error);
       setRecording(false);
+      
+      // Notify parent of the error and recording state change
+      if (onTranscriptChange) {
+        onTranscriptChange(accumulatedTranscriptRef.current, false); // false = recording stopped
+      }
+      
       onStatusChange("Error starting recording: " + error.message);
       
       // Make sure resources are released if there's an error
@@ -474,22 +471,30 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
   // Stop recording
   const stopRecording = async (silent = false) => {
     if (recording) {
-      debugLog("Stopping microphone and releasing resources");
+      debugLog("Stopping recording process");
+      const isUserInitiated = !silent;
       
       // Get the current ephemeral user ID
       const currentEphemeralId = ephemeralUserIdRef.current;
       
       // First, signal the server to stop transcription
       if (!silent && socketRef.current && socketRef.current.connected && currentEphemeralId) {
-        debugLog("Sending stop signal to server with ephemeral userId:", currentEphemeralId);
         socketRef.current.emit("toggle_transcription", { 
           action: "stop",
           userId: currentEphemeralId
         });
       }
       
-      // Set recording state to false immediately
+      // IMPORTANT: Set recording state to false BEFORE stopping the recording process
       setRecording(false);
+      
+      // Notify parent component immediately
+      if (onTranscriptChange) {
+        onTranscriptChange(accumulatedTranscriptRef.current, false); // false = recording stopped
+      }
+      
+      // Notify parent with status change that recording has stopped
+      onStatusChange("Click the microphone to start");
       
       // Get end time and format timestamps
       const endTime = new Date();
@@ -504,7 +509,9 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
         title: `Note ${date} ${time}`,
         duration: duration, // Store as seconds for database
         durationStr: `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`, // For display
-        userId
+        userId,
+        stayOnPage: true,
+        toggleAction: isUserInitiated ? "user_stopped" : "system_stopped"
       };
       
       // Send complete transcript to parent component if there's content
@@ -517,15 +524,12 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
       
       // Disconnect socket after stopping
       if (socketRef.current) {
-        debugLog("Disconnecting socket");
         socketRef.current.disconnect();
         socketRef.current = null;
       }
       
       // Clear the ephemeral user ID
       ephemeralUserIdRef.current = null;
-      
-      onStatusChange("Click the microphone to start");
     }
   };
 
@@ -537,6 +541,35 @@ const TranscriptionMic = ({ onStatusChange, onTranscriptChange, userId, onComple
       startRecording();
     }
   };
+
+  // Update the useEffect for socket message handling
+  useEffect(() => {
+    // Check if socketRef.current exists before accessing it
+    if (!socketRef.current) return;
+
+    const handleMessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'transcript') {
+          // ALWAYS pass the transcript to the parent, regardless of local recording state
+          console.log("📝 Transcript received:", { text: data.text.substring(0, 20) + "...", isRecording: recording });
+          onTranscriptChange(data.text, recording);
+        }
+      } catch (error) {
+        console.error("Error handling message:", error);
+      }
+    };
+
+    socketRef.current.onmessage = handleMessage;
+    
+    return () => {
+      // Make sure socketRef.current still exists in cleanup
+      if (socketRef.current) {
+        socketRef.current.onmessage = null;
+      }
+    };
+  }, [recording, onTranscriptChange]);
 
   return (
     <div className="mic-container">

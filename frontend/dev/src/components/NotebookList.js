@@ -1,43 +1,46 @@
 import React from 'react';
-import './TranscriptList.css';
+import './NotebookList.css';
 
-const TranscriptList = ({ transcripts = [], onStartNewTranscription, onViewTranscript }) => {
-  // Ensure transcripts is always an array
-  const safeTranscripts = Array.isArray(transcripts) ? transcripts : [];
+const NotebookList = ({ transcripts: notebooks, onStartNewTranscription: onStartNewNotebook, onViewTranscript: onViewNotebook }) => {
+  // Ensure notebooks is always an array
+  const safeNotebooks = Array.isArray(notebooks) ? notebooks : [];
   
   return (
-    <div className="transcript-list-container">
-      <div className="transcript-list-header">
-        <h2>Your Transcripts</h2>
+    <div className="notebook-list-container">
+      <div className="notebook-list-header">
+        <h2>Your Notebooks</h2>
         <button 
-          className="new-transcription-button" 
-          onClick={onStartNewTranscription}
+          className="new-notebook-button" 
+          onClick={() => {
+            console.log("New Notebook button clicked");
+            onStartNewNotebook();
+          }}
         >
-          New Transcription
+          New Notebook
         </button>
       </div>
       
-      {safeTranscripts.length > 0 ? (
-        <div className="transcript-items">
-          {safeTranscripts.map((transcript) => (
+      {safeNotebooks.length > 0 ? (
+        <div className="notebook-items">
+          {safeNotebooks.map((notebook) => (
             <div 
-              key={transcript._id || `transcript-${Math.random()}`} 
-              className="transcript-list-item"
-              onClick={() => onViewTranscript(transcript._id)}
+              key={notebook._id || `notebook-${Math.random()}`} 
+              className="notebook-list-item"
+              onClick={() => onViewNotebook(notebook._id)}
             >
-              <div className="transcript-list-item-header">
-                <h3>{transcript.title || 'Untitled'}</h3>
-                <span className="transcript-date">
-                  {formatDate(transcript.createdAt || transcript.date)}
+              <div className="notebook-list-item-header">
+                <h3>{notebook.title || 'Untitled'}</h3>
+                <span className="notebook-date">
+                  {formatDate(notebook.createdAt || notebook.date)}
                 </span>
               </div>
-              <p className="transcript-preview">
-                {((transcript.originalText || transcript.text || '').substring(0, 100))}
-                {((transcript.originalText || transcript.text || '').length > 100 ? '...' : '')}
+              <p className="notebook-preview">
+                {((notebook.noteText || notebook.originalText || notebook.text || '').substring(0, 100))}
+                {((notebook.noteText || notebook.originalText || notebook.text || '').length > 100 ? '...' : '')}
               </p>
-              <div className="transcript-item-footer">
-                <span className="transcript-duration">
-                  Duration: {formatDuration(transcript.duration)}
+              <div className="notebook-item-footer">
+                <span className="notebook-duration">
+                  Duration: {formatDuration(notebook.duration)}
                 </span>
               </div>
             </div>
@@ -46,8 +49,8 @@ const TranscriptList = ({ transcripts = [], onStartNewTranscription, onViewTrans
       ) : (
         <div className="empty-state">
           <div className="empty-state-icon">📝</div>
-          <h3>No transcripts available</h3>
-          <p>Click "New Transcription" to create your first transcript</p>
+          <h3>No notebooks available</h3>
+          <p>Click "New Notebook" to create your first notebook</p>
         </div>
       )}
     </div>
@@ -96,4 +99,4 @@ const formatDuration = (durationSeconds) => {
   }
 };
 
-export default TranscriptList; 
+export default NotebookList; 
