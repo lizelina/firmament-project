@@ -1,9 +1,43 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './NotebookList.css';
 
-const NotebookList = ({ transcripts: notebooks, onStartNewTranscription: onStartNewNotebook, onViewTranscript: onViewNotebook }) => {
+const NotebookList = ({ 
+  transcripts: notebooks, 
+  onStartNewTranscription: onStartNewNotebook, 
+  onViewTranscript: onViewNotebook,
+  onDeleteNotebook 
+}) => {
+  // State to track deletion in progress
+  const [deletingId, setDeletingId] = useState(null);
+  
   // Ensure notebooks is always an array
   const safeNotebooks = Array.isArray(notebooks) ? notebooks : [];
+  
+  // Handle delete button click
+  const handleDelete = async (e, notebookId) => {
+    e.stopPropagation(); // Prevent notebook click event
+    
+    if (!notebookId) return;
+    
+    // Confirm deletion
+    if (!window.confirm('Are you sure you want to delete this notebook? This action cannot be undone.')) {
+      return;
+    }
+    
+    // Set the deleting status
+    setDeletingId(notebookId);
+    
+    try {
+      // Call the parent's delete function
+      await onDeleteNotebook(notebookId);
+      // No need to remove from local state, parent component will refresh the list
+    } catch (error) {
+      console.error('Error deleting notebook:', error);
+      alert('Failed to delete notebook. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
   
   return (
     <div className="notebook-list-container">
@@ -42,6 +76,23 @@ const NotebookList = ({ transcripts: notebooks, onStartNewTranscription: onStart
                 <span className="notebook-duration">
                   Duration: {formatDuration(notebook.duration)}
                 </span>
+                
+                <button 
+                  className="delete-notebook-button" 
+                  onClick={(e) => handleDelete(e, notebook._id)}
+                  disabled={deletingId === notebook._id}
+                  title="Delete notebook"
+                >
+                  {deletingId === notebook._id ? 
+                    <span className="deleting-spinner"></span> : 
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      <line x1="10" y1="11" x2="10" y2="17"></line>
+                      <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                  }
+                </button>
               </div>
             </div>
           ))}

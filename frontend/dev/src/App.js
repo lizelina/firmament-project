@@ -189,7 +189,7 @@ function App() {
         // If save was successful, fetch latest notebooks
         await fetchUserNotebooks(userId);
         
-        // Show success message if provided
+        // Show success message if provided and not null
         if (successMessage) {
           alert(successMessage);
         }
@@ -225,6 +225,50 @@ function App() {
       return null;
     } finally {
       setIsSaving(false);
+    }
+  };
+  
+  const handleDeleteNotebook = async (notebookId) => {
+    if (!notebookId) {
+      console.error("Cannot delete notebook: No notebook ID provided");
+      return;
+    }
+    
+    console.log("Deleting notebook with ID:", notebookId);
+    
+    try {
+      // Send delete request to the server
+      const response = await fetch(`http://localhost:8000/notebooks/${notebookId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log("Notebook deleted successfully");
+        
+        // Update the local notebooks list by removing the deleted notebook
+        setNotebooks(prevNotebooks => prevNotebooks.filter(notebook => notebook._id !== notebookId));
+        
+        // If the currently selected notebook is the one being deleted, go back to list view
+        if (selectedNotebook && selectedNotebook._id === notebookId) {
+          setCurrentView('list');
+          setSelectedNotebook(null);
+        }
+      } else {
+        console.error('Error deleting notebook:', result.message);
+        alert(`Failed to delete notebook: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error deleting notebook:', error);
+      alert(`Error deleting notebook: ${error.message}`);
     }
   };
   
@@ -271,6 +315,7 @@ function App() {
             transcripts={notebooks}
             onStartNewTranscription={handleStartNewNotebook}
             onViewTranscript={handleViewNotebook}
+            onDeleteNotebook={handleDeleteNotebook}
           />
         )}
         

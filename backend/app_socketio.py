@@ -86,13 +86,16 @@ def initialize_deepgram_connection(session_id):
 
         def on_message(self, result, **kwargs):
             try:
+                # Store session_id in kwargs (this is the fix)
+                kwargs['session_id'] = session_id
+                
                 # Update activity timestamp
                 connection_activity[session_id] = time.time()
                 
                 transcript = result.channel.alternatives[0].transcript
                 if len(transcript) > 0:
                     # Only log non-empty transcripts
-                    logger.info(f"Session {session_id} transcript: {transcript}")
+                    logger.info(f"Session {session_id} transcript received: {transcript[:30]}...")
                     
                     # Find all socket IDs for this session
                     target_socket_ids = [
@@ -102,6 +105,7 @@ def initialize_deepgram_connection(session_id):
                     
                     if target_socket_ids:
                         # Emit to all sockets associated with this session
+                        logger.info(f"Sending transcript to {len(target_socket_ids)} clients for session {session_id}")
                         for socket_id in target_socket_ids:
                             socketio.emit('transcription_update', {'transcription': transcript}, room=socket_id)
                     else:
@@ -247,9 +251,13 @@ def handle_audio_stream(data):
         
         # Send the audio data to Deepgram API
         try:
-            user_connections[session_id].send(binary_data)
-            if random.randint(1, 200) == 1:
-                logger.info(f"Successfully sent {len(binary_data)} bytes to Deepgram for session {session_id}")
+            if session_id in user_connections and user_connections[session_id]:
+                user_connections[session_id].send(binary_data)
+                if random.randint(1, 200) == 1:
+                    logger.info(f"Successfully sent {len(binary_data)} bytes to Deepgram for session {session_id}")
+            else:
+                logger.error(f"Cannot send audio: No active connection for session {session_id}")
+                socketio.emit('connection_lost', {'message': 'Connection lost. Please restart recording.'}, room=socket_id)
         except Exception as e:
             logger.error(f"Error sending data to Deepgram: {e}")
             socketio.emit('deepgram_error', {'error': f'Error sending audio: {str(e)}'}, room=socket_id)
@@ -329,7 +337,7 @@ def handle_toggle_transcription(data):
                 logger.warning(f"Session {session_id}: No active connection to stop")
                 socketio.emit('deepgram_stopped', {'status': 'no_connection'}, room=socket_id)
     except Exception as e:
-        logger.error(f"Error handling toggle_transcription: {e}")
+        logger.error(f"Error handling toggle_transcription: {e}", exc_info=True)
 
 @socketio.on('connect')
 def server_connect():

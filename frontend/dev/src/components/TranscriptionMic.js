@@ -65,6 +65,8 @@ const TranscriptionMic = ({
 
   // Respond to changes in isRecording prop from parent
   useEffect(() => {
+    debugLog(`Parent isRecording prop changed to: ${isRecording}, local recording state: ${recording}`);
+    
     // If parent sets isRecording to false while we're recording, forcibly stop
     if (isRecording === false && recording === true) {
       debugLog("Parent forced recording stop");
@@ -127,6 +129,7 @@ const TranscriptionMic = ({
 
       // Clean up existing socket if any
       if (socketRef.current) {
+        debugLog("Closing existing socket before creating a new one");
         socketRef.current.disconnect();
         socketRef.current = null;
       }
@@ -134,127 +137,156 @@ const TranscriptionMic = ({
       const socketPort = 5001;
       const socketUrl = `http://localhost:${socketPort}`;
       
-      const socket = io(socketUrl, {
-        query: { userId: ephemeralUserId }, // Use ephemeral ID in query params
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000,
-        withCredentials: false
-      });
+      debugLog(`Initializing socket connection to ${socketUrl} with userId ${ephemeralUserId}`);
+      
+      try {
+        const socket = io(socketUrl, {
+          query: { userId: ephemeralUserId }, // Use ephemeral ID in query params
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          timeout: 20000,
+          withCredentials: false
+        });
 
-      // Connection status events
-      socket.on('connect', () => {
-        reconnectAttemptsRef.current = 0;
-        setConnected(true);
-        onStatusChange("Socket connected. Starting transcription...");
-        resolve(socket); // Resolve the promise when connected
-      });
+        // Connection status events
+        socket.on('connect', () => {
+          reconnectAttemptsRef.current = 0;
+          setConnected(true);
+          debugLog("🟢 Socket connected successfully");
+          onStatusChange("Socket connected. Starting transcription...");
+          resolve(socket); // Resolve the promise when connected
+        });
 
-      socket.on('disconnect', () => {
-        setConnected(false);
-        setDeepgramConnected(false);
-        onStatusChange("Socket disconnected. Stopping recording...");
-        
-        if (recording) {
-          stopRecording(true);
-        }
-      });
-
-      socket.on('connect_error', (error) => {
-        console.error('Connection error:', error);
-        reconnectAttemptsRef.current++;
-        onStatusChange(`Error connecting to server: ${error.message}. Attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`);
-        
-        if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
-          onStatusChange("Could not connect to server. Please try again later.");
-          reject(new Error(`Connection failed after ${MAX_RECONNECT_ATTEMPTS} attempts`));
-        }
-      });
-
-      socket.on('reconnect', (attemptNumber) => {
-        onStatusChange("Reconnected to server. Continuing transcription...");
-      });
-
-      // Deepgram event listeners
-      socket.on('deepgram_ready', (data) => {
-        setDeepgramConnected(true);
-        onStatusChange("Listening... Speak now");
-      });
-
-      socket.on('deepgram_stopped', (data) => {
-        setDeepgramConnected(false);
-        
-        if (recording) {
-          stopRecording(true);
-        }
-        
-        onStatusChange("Transcription stopped");
-      });
-
-      socket.on('deepgram_disconnected', (data) => {
-        setDeepgramConnected(false);
-        if (recording) {
-          stopRecording(true);
-          onStatusChange("Deepgram disconnected. Please try again.");
-        }
-      });
-
-      socket.on('deepgram_error', (data) => {
-        console.error('Deepgram error:', data);
-        onStatusChange("Error with speech service: " + data.error);
-      });
-
-      socket.on('connection_lost', (data) => {
-        console.error('Connection lost:', data);
-        setDeepgramConnected(false);
-        onStatusChange(data.message);
-        
-        if (recording) {
-          stopRecording(true);
-        }
-      });
-
-      socket.on('connection_error', (data) => {
-        console.error('Connection error:', data);
-        onStatusChange(data.message);
-      });
-
-      // Handle socket transcription updates
-      socket.on("transcription_update", (data) => {
-        if (data.transcription && data.transcription.trim() !== '') {
-          // IMPORTANT: Always update the transcript, regardless of recording state
-          // This ensures we don't miss any data from the speech service
-          debugLog(`Received transcript update: "${data.transcription}" (recording: ${recording})`);
+        socket.on('disconnect', () => {
+          setConnected(false);
+          setDeepgramConnected(false);
+          debugLog("🔴 Socket disconnected, reason:", socket.disconnected);
+          onStatusChange("Socket disconnected. Stopping recording...");
           
-          // Append to accumulated transcript
-          const currentTranscript = accumulatedTranscriptRef.current;
-          // Add spacing if needed
-          const spacer = currentTranscript && !currentTranscript.endsWith(' ') ? ' ' : '';
-          accumulatedTranscriptRef.current = currentTranscript + spacer + data.transcription;
-          
-          // Always update the transcript in the parent, KEEP CURRENT RECORDING STATE
-          if (onTranscriptChange) {
-            onTranscriptChange(accumulatedTranscriptRef.current, recording);
+          if (recording) {
+            debugLog("Recording active during socket disconnect, stopping recording");
+            stopRecording(true);
           }
-        }
-      });
+        });
 
-      // Store socket in ref
-      socketRef.current = socket;
-      
-      // Set a connection timeout
-      const connectionTimeout = setTimeout(() => {
-        if (!socket.connected) {
-          reject(new Error("Socket connection timed out"));
-        }
-      }, 10000); // 10 second timeout
-      
-      // Clear timeout if connected
-      socket.on('connect', () => {
-        clearTimeout(connectionTimeout);
-      });
+        socket.on('connect_error', (error) => {
+          console.error('Connection error:', error);
+          debugLog(`❌ Socket connection error: ${error.message}`);
+          reconnectAttemptsRef.current++;
+          onStatusChange(`Error connecting to server: ${error.message}. Attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`);
+          
+          if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+            onStatusChange("Could not connect to server. Please try again later.");
+            reject(new Error(`Connection failed after ${MAX_RECONNECT_ATTEMPTS} attempts`));
+          }
+        });
+
+        socket.on('reconnect', (attemptNumber) => {
+          debugLog(`🔄 Socket reconnected after ${attemptNumber} attempts`);
+          onStatusChange("Reconnected to server. Continuing transcription...");
+        });
+
+        // Deepgram event listeners
+        socket.on('deepgram_ready', (data) => {
+          setDeepgramConnected(true);
+          debugLog("🎙️ Deepgram connection ready for transcription");
+          onStatusChange("Listening... Speak now");
+        });
+
+        socket.on('deepgram_stopped', (data) => {
+          setDeepgramConnected(false);
+          debugLog("🛑 Deepgram connection stopped", data);
+          
+          if (recording) {
+            debugLog("Recording active during deepgram_stopped event, stopping recording");
+            stopRecording(true);
+          }
+          
+          onStatusChange("Transcription stopped");
+        });
+
+        socket.on('deepgram_disconnected', (data) => {
+          setDeepgramConnected(false);
+          debugLog("⚡ Deepgram disconnected", data);
+          if (recording) {
+            debugLog("Recording active during deepgram_disconnected event, stopping recording");
+            stopRecording(true);
+            onStatusChange("Deepgram disconnected. Please try again.");
+          }
+        });
+
+        socket.on('deepgram_error', (data) => {
+          console.error('Deepgram error:', data);
+          debugLog("❌ Deepgram error:", data);
+          onStatusChange("Error with speech service: " + data.error);
+        });
+
+        socket.on('connection_lost', (data) => {
+          console.error('Connection lost:', data);
+          debugLog("🔌 Server connection lost:", data);
+          setDeepgramConnected(false);
+          onStatusChange(data.message);
+          
+          if (recording) {
+            debugLog("Recording active during connection_lost event, stopping recording");
+            stopRecording(true);
+          }
+        });
+
+        socket.on('connection_error', (data) => {
+          console.error('Connection error:', data);
+          debugLog("❌ Server connection error:", data);
+          onStatusChange(data.message);
+        });
+
+        // Handle socket transcription updates
+        socket.on("transcription_update", (data) => {
+          if (data.transcription && data.transcription.trim() !== '') {
+            // Update last activity time when receiving transcripts
+            lastActivityTimeRef.current = Date.now();
+            
+            // IMPORTANT: Always update the transcript, regardless of recording state
+            // This ensures we don't miss any data from the speech service
+            debugLog(`Received transcript update: "${data.transcription.substring(0, 30)}..." (recording: ${recording})`);
+            
+            // Append to accumulated transcript
+            const currentTranscript = accumulatedTranscriptRef.current;
+            // Add spacing if needed
+            const spacer = currentTranscript && !currentTranscript.endsWith(' ') ? ' ' : '';
+            accumulatedTranscriptRef.current = currentTranscript + spacer + data.transcription;
+            
+            // Always update the transcript in the parent, KEEP CURRENT RECORDING STATE
+            if (onTranscriptChange) {
+              // IMPORTANT: Do not pass the recording state as second argument 
+              // as this may be misinterpreted by the parent component
+              // Instead, only pass the transcript text to avoid unintended state changes
+              debugLog(`Sending transcript update to parent, maintaining current recording state: ${recording}`);
+              onTranscriptChange(accumulatedTranscriptRef.current, recording);
+            }
+          }
+        });
+
+        // Store socket in ref
+        socketRef.current = socket;
+        
+        // Set a connection timeout
+        const connectionTimeout = setTimeout(() => {
+          if (!socket.connected) {
+            debugLog("Socket connection timed out after 10 seconds");
+            reject(new Error("Socket connection timed out"));
+          }
+        }, 10000); // 10 second timeout
+        
+        // Clear timeout if connected
+        socket.on('connect', () => {
+          clearTimeout(connectionTimeout);
+        });
+      } catch (error) {
+        debugLog("Error initializing socket:", error);
+        reject(error);
+      }
     });
   };
 
@@ -444,6 +476,9 @@ const TranscriptionMic = ({
         setIsRecording(true);
       }
       
+      // Reset last activity time
+      lastActivityTimeRef.current = Date.now();
+      
       // Notify parent component immediately with empty transcript
       if (onTranscriptChange) {
         debugLog("Notifying parent that recording is starting with empty transcript");
@@ -474,6 +509,34 @@ const TranscriptionMic = ({
           action: "start",
           userId: newEphemeralUserId
         });
+        
+        // Add a connection health check using a simple interval
+        if (healthCheckIntervalRef.current) {
+          clearInterval(healthCheckIntervalRef.current);
+        }
+        
+        // Start a new health check interval
+        healthCheckIntervalRef.current = setInterval(() => {
+          if (!recording) {
+            clearInterval(healthCheckIntervalRef.current);
+            return;
+          }
+          
+          const now = Date.now();
+          const inactiveTime = now - lastActivityTimeRef.current;
+          
+          // If we haven't received any transcript updates for 20 seconds, something might be wrong
+          if (inactiveTime > 20000) {
+            debugLog("Connection appears to be inactive for 20+ seconds, stopping recording");
+            
+            // Stop recording due to inactivity
+            onStatusChange("Connection inactive. Stopping recording.");
+            stopRecording(false);
+            
+            // Clear the interval
+            clearInterval(healthCheckIntervalRef.current);
+          }
+        }, 10000);
       } else {
         throw new Error("Socket not connected, can't start transcription");
       }
@@ -506,6 +569,19 @@ const TranscriptionMic = ({
       ephemeralUserIdRef.current = null;
     }
   };
+
+  // Add a health check interval to detect inactive connections
+  const healthCheckIntervalRef = useRef(null);
+  const lastActivityTimeRef = useRef(Date.now());
+  
+  // Clean up the health check on unmount
+  useEffect(() => {
+    return () => {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Stop recording
   const stopRecording = async (silent = false) => {
@@ -543,7 +619,13 @@ const TranscriptionMic = ({
       // Get end time and format timestamps
       const endTime = new Date();
       const { date, time } = formatDateTime();
-      const duration = Math.round((endTime - startTimeRef.current) / 1000); // Duration in seconds
+      
+      // Calculate duration accurately
+      let duration = 0;
+      if (startTimeRef.current) {
+        duration = Math.round((endTime - startTimeRef.current) / 1000); // Duration in seconds
+        debugLog(`Recording duration: ${duration} seconds`);
+      }
       
       // Create the complete transcript with metadata for database storage
       const completeTranscript = {
@@ -560,6 +642,7 @@ const TranscriptionMic = ({
       
       // Send complete transcript to parent component if there's content
       if (onCompleteTranscript && accumulatedTranscriptRef.current.trim() !== '') {
+        debugLog(`Sending complete transcript to parent with duration: ${duration} seconds`);
         onCompleteTranscript(completeTranscript);
       }
       
@@ -574,6 +657,9 @@ const TranscriptionMic = ({
       
       // Clear the ephemeral user ID
       ephemeralUserIdRef.current = null;
+      
+      // Clear start time
+      startTimeRef.current = null;
     }
   };
 
@@ -591,13 +677,15 @@ const TranscriptionMic = ({
     // Check if socketRef.current exists before accessing it
     if (!socketRef.current) return;
 
+    debugLog("Setting up socket message handler");
+
     const handleMessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         
         if (data.type === 'transcript') {
           // ALWAYS pass the transcript to the parent, regardless of local recording state
-          console.log("📝 Transcript received:", { text: data.text.substring(0, 20) + "...", isRecording: recording });
+          debugLog("📝 Transcript received:", { text: data.text.substring(0, 20) + "...", isRecording: recording });
           onTranscriptChange(data.text, recording);
         }
       } catch (error) {
@@ -610,6 +698,7 @@ const TranscriptionMic = ({
     return () => {
       // Make sure socketRef.current still exists in cleanup
       if (socketRef.current) {
+        debugLog("Cleaning up socket message handler");
         socketRef.current.onmessage = null;
       }
     };

@@ -26,19 +26,32 @@
   gap: 5px;
 }
 
-.notebook-title-input {
+.notebook-title-display {
   font-size: 24px;
   font-weight: 600;
   color: #333;
-  border: none;
-  background-color: transparent;
   padding: 5px;
   border-radius: 4px;
+  margin: 0;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-.notebook-title-input:focus {
-  outline: none;
+.notebook-title-display:hover {
   background-color: rgba(0, 0, 0, 0.05);
+}
+
+.notebook-title-input.editing {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  border: 1px solid #ced4da;
+  background-color: white;
+  padding: 5px;
+  border-radius: 4px;
+  width: 100%;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
 }
 
 .notebook-date {
@@ -273,4 +286,237 @@
   .transcription-display {
     min-height: 200px;
   }
+}
+
+/* Add CSS for the summary and keywords components */
+
+.summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.summary-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.summary-error {
+  background-color: #ffebee;
+  border-radius: 4px;
+  padding: 15px;
+  color: #d32f2f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.summary-error button {
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.keywords-section {
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.keywords-section h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333;
+  font-size: 18px;
+}
+
+.keywords-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.keyword-tag {
+  background-color: #e0f7fa;
+  color: #006064;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.summary-section {
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  flex-grow: 1;
+}
+
+.summary-section h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333;
+  font-size: 18px;
+}
+
+.summary-text {
+  line-height: 1.6;
+  color: #333;
+  white-space: pre-wrap;
+}
+
+.summary-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+
+.regenerate-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.regenerate-button:hover {
+  background-color: #2980b9;
+}
+
+.placeholder-text {
+  color: #999;
+  font-style: italic;
+}
+
+/* Add styles for copy buttons and headers */
+
+.transcription-text-container,
+.keywords-section,
+.summary-section {
+  position: relative;
+}
+
+.transcription-header,
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.copy-button {
+  background-color: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  color: #555;
+  position: relative;
+}
+
+.copy-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #3498db;
+}
+
+.copy-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.copy-button svg {
+  margin-right: 4px;
+}
+
+.copy-feedback {
+  position: absolute;
+  bottom: -30px;
+  right: 0;
+  background-color: #333;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+}
+
+/* Add arrow to the top of the feedback tooltip */
+.copy-feedback::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: 10px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 5px solid #333;
+}
+
+/* Styles for clickable keyword tags */
+.keyword-tag.clickable {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border: none;
+  transition: all 0.2s ease;
+  gap: 4px;
+  font-family: inherit;
+}
+
+.keyword-tag.clickable:hover {
+  background-color: #b3e5fc;
+  color: #01579b;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.keyword-tag.clickable:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.keyword-icon {
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+
+.keyword-tag.clickable:hover .keyword-icon {
+  opacity: 1;
 } 

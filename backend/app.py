@@ -215,6 +215,20 @@ def create_app():
             error_message = result.get('message', 'Failed to retrieve notebooks') if result else 'Database error'
             return jsonify({'success': False, 'message': error_message}), 500
 
+    @app.route('/notebooks/<notebook_id>', methods=['DELETE'])
+    def delete_notebook(notebook_id):
+        """Delete a specific notebook by ID"""
+        logger.info(f"Deleting notebook with ID: {notebook_id}")
+        
+        # Delete from MongoDB notebooks collection
+        result = db.delete_note(notebook_id, 'notebooks')
+        
+        if result and result.get('success'):
+            return jsonify(result)
+        else:
+            error_message = result.get('message', 'Failed to delete notebook') if result else 'Database error'
+            return jsonify({'success': False, 'message': error_message}), 500
+
     # LEGACY
     @app.route('/transcripts', methods=['POST'])
     def save_transcript():

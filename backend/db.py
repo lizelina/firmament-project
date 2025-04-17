@@ -369,4 +369,43 @@ def get_user_transcripts(user_id):
         return {'success': True, 'transcripts': transcripts}
     except Exception as e:
         logger.error(f"Error getting user transcripts: {e}")
+        return {'success': False, 'message': f'Database error: {str(e)}'}
+
+def delete_note(note_id, collection_name='notebooks'):
+    """
+    Delete a note from the specified collection.
+    Default is notebooks_collection (= db['notebooks']).
+    """
+
+    # Get the appropriate collection
+    if collection_name == 'notebooks':
+        target_collection = notebooks_collection
+    else:
+        target_collection = userdata_collection
+
+    if target_collection is None:
+        logger.error(f"MongoDB connection not available for collection {collection_name}")
+        return {'success': False, 'message': 'Database not available'}
+    
+    try:
+        # Convert string ID to ObjectId
+        try:
+            note_object_id = ObjectId(note_id)
+        except Exception as e:
+            logger.warning(f"Invalid note_id format: {e}")
+            return {'success': False, 'message': 'Invalid note ID format'}
+        
+        # Delete the note
+        result = target_collection.delete_one({'_id': note_object_id})
+        
+        if result.deleted_count > 0:
+            return {
+                'success': True, 
+                'message': 'Note deleted successfully'
+            }
+        else:
+            return {'success': False, 'message': 'Note not found'}
+        
+    except Exception as e:
+        logger.error(f"Error deleting note: {e}")
         return {'success': False, 'message': f'Database error: {str(e)}'} 
