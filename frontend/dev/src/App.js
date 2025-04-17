@@ -126,6 +126,10 @@ function App() {
   const handleBackToList = () => {
     setCurrentView('list');
     setSelectedNote(null);
+    // Refresh notes when going back to list view
+    if (userId) {
+      fetchUserNotes(userId);
+    }
   };
 
   const handleSaveNote = async (noteData) => {
