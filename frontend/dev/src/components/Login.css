@@ -1,32 +1,53 @@
+:root {
+  --primary-color: #5056e0;
+  --primary-light: #6f74e8;
+  --primary-dark: #3d3fb3;
+  --secondary-color: #23d9b7;
+  --text-color: #343a40;
+  --text-light: #6c757d;
+  --text-lighter: #adb5bd;
+  --bg-color: #f8f9fa;
+  --bg-light: #ffffff;
+  --bg-dark: #e9ecef;
+  --border-radius: 12px;
+  --border-radius-sm: 8px;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+}
+
 .login-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #4a90e2 0%, #2c3e50 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
   padding: 20px;
 }
 
 .login-form-wrapper {
-  background-color: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  background-color: var(--bg-light);
+  border-radius: var(--border-radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   padding: 40px;
   width: 100%;
-  max-width: 420px;
-  transition: transform 0.3s ease;
+  max-width: 440px;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
 }
 
 .login-form-wrapper:hover {
   transform: translateY(-5px);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
 }
 
 .login-form-wrapper h1 {
   text-align: center;
-  margin-bottom: 28px;
-  color: #2c3e50;
+  margin-bottom: 32px;
+  color: var(--text-color);
   font-size: 28px;
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .login-form {
@@ -43,53 +64,64 @@
 .form-group label {
   margin-bottom: 8px;
   font-weight: 500;
-  color: #4a5568;
+  color: var(--text-color);
   font-size: 15px;
 }
 
 .form-group input {
-  padding: 12px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--border-radius-sm);
   font-size: 16px;
-  transition: all 0.2s;
-  background-color: #f8fafc;
+  transition: all var(--transition-fast);
+  background-color: var(--bg-color);
 }
 
 .form-group input:focus {
-  border-color: #4a90e2;
+  border-color: var(--primary-light);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
-  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(80, 86, 224, 0.15);
+  background-color: var(--bg-light);
 }
 
 .login-button {
-  background-color: #4a90e2;
+  background-color: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--border-radius-sm);
   padding: 14px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all var(--transition-fast);
   margin-top: 10px;
+  box-shadow: var(--shadow-sm);
 }
 
 .login-button:hover {
-  background-color: #3a7bca;
+  background-color: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(80, 86, 224, 0.25);
+}
+
+.login-button:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
 }
 
 .login-button:disabled {
-  background-color: #a0c0e8;
+  background-color: var(--primary-light);
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .error-message {
   color: #e53e3e;
   background-color: #fff5f5;
-  padding: 12px;
-  border-radius: 8px;
+  padding: 14px;
+  border-radius: var(--border-radius-sm);
   font-size: 14px;
   text-align: center;
   border: 1px solid #fed7d7;
@@ -97,14 +129,30 @@
 
 .login-help {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 24px;
   font-size: 14px;
-  color: #718096;
+  color: var(--text-light);
+}
+
+.login-help p {
+  margin: 6px 0;
+}
+
+.login-help a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.login-help a:hover {
+  color: var(--primary-light);
+  text-decoration: underline;
 }
 
 @media (max-width: 480px) {
   .login-form-wrapper {
-    padding: 25px;
+    padding: 30px 20px;
   }
   
   .login-form-wrapper h1 {
@@ -113,6 +161,6 @@
   
   .form-group input,
   .login-button {
-    padding: 10px 12px;
+    padding: 12px 14px;
   }
-} 
+}

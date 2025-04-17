@@ -2,11 +2,23 @@ import React, { useState, useEffect, useRef } from 'react';
 import TranscriptionMic from './TranscriptionMic';
 import { GEMINI_API_KEY } from '../config/api-keys';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { motion, AnimatePresence } from 'framer-motion';
 import './NotebookDetail.css';
 
 // Initialize the Generative AI model
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+// Animation variants
+const fadeIn = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.4 } }
+};
+
+const tabVariants = {
+  hidden: { y: 10, opacity: 0 },
+  visible: { y: 0, opacity: 1, transition: { duration: 0.3 } }
+};
 
 const NotebookDetail = ({ 
   notebook, 
@@ -511,10 +523,20 @@ const NotebookDetail = ({
   };
 
   return (
-    <div className="notebook-detail-container">
+    <motion.div 
+      className="notebook-detail-container"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       {/* Header row with title and navigation */}
       <div className="notebook-header">
-        <div className="notebook-title-section">
+        <motion.div 
+          className="notebook-title-section"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1, duration: 0.4 }}
+        >
           {isEditingTitle ? (
             <input 
               ref={titleInputRef}
@@ -536,9 +558,14 @@ const NotebookDetail = ({
             </h2>
           )}
           <div className="notebook-date">{getCurrentDateTime()}</div>
-        </div>
+        </motion.div>
         
-        <div className="notebook-actions">
+        <motion.div 
+          className="notebook-actions"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+        >
           <button 
             className="home-button" 
             onClick={handleBackToList}
@@ -552,25 +579,44 @@ const NotebookDetail = ({
           >
             Save
           </button>
-        </div>
+        </motion.div>
       </div>
       
       {/* Main content area with two columns */}
-      <div className="notebook-content">
+      <motion.div 
+        className="notebook-content"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
         {/* Left column - Note taking area */}
-        <div className="note-column">
+        <motion.div 
+          className="note-column"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
+        >
           <textarea
             className="note-textarea"
             value={noteText}
             onChange={handleNoteChange}
             placeholder="Start typing your notes here..."
           />
-        </div>
+        </motion.div>
         
         {/* Right column - Transcription/Summary area */}
-        <div className="transcription-column">
+        <motion.div 
+          className="transcription-column"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.5, duration: 0.4 }}
+        >
           {/* Microphone component */}
-          <div className="microphone-container">
+          <motion.div 
+            className="microphone-container"
+            whileHover={{ y: -2, boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)" }}
+            transition={{ duration: 0.2 }}
+          >
             <TranscriptionMic
               onStatusChange={handleStatusChange}
               onTranscriptChange={handleTranscriptChange}
@@ -580,28 +626,39 @@ const NotebookDetail = ({
               setIsRecording={setIsRecording}
             />
             {status && (
-              <div className="transcription-status">{status}</div>
+              <motion.div 
+                className="transcription-status"
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                key={status}
+              >
+                {status}
+              </motion.div>
             )}
-          </div>
+          </motion.div>
           
           {/* Tabs for Transcript and Summary */}
           <div className="transcription-tabs">
-            <div 
+            <motion.div 
               className={`tab ${activeTab === 'transcript' ? 'active' : ''}`}
               onClick={() => handleTabChange('transcript')}
+              whileHover={activeTab !== 'transcript' ? { y: -2 } : {}}
+              whileTap={{ scale: 0.98 }}
             >
               Transcript
               {isRecording && <span className="recording-indicator"></span>}
-            </div>
+            </motion.div>
             
             {/* Only show the summary tab when NOT recording and we have transcript content */}
             {shouldShowSummaryTab ? (
-              <div 
+              <motion.div 
                 className={`tab ${activeTab === 'summary' ? 'active' : ''}`}
                 onClick={() => handleTabChange('summary')}
+                whileHover={activeTab !== 'summary' ? { y: -2 } : {}}
+                whileTap={{ scale: 0.98 }}
               >
                 Summary
-              </div>
+              </motion.div>
             ) : (
               hasTranscript && !isRecording && (
                 <div className="tab disabled">
@@ -612,126 +669,220 @@ const NotebookDetail = ({
           </div>
           
           {/* Transcription/Summary display area */}
-          <div className="tab-content">
-            {activeTab === 'transcript' && (
-              <div className="transcription-text-container">
-                <div className="transcription-header">
-                  <h3>Transcript</h3>
-                  <button 
-                    className="copy-button"
-                    onClick={() => handleCopy(transcriptText, 'transcript')}
-                    disabled={!transcriptText}
-                    title="Copy transcript to clipboard"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    {copyFeedback.type === 'transcript' && (
-                      <span className="copy-feedback">{copyFeedback.message}</span>
-                    )}
-                  </button>
-                </div>
-                <div className="transcription-text">
-                  {transcriptText || <span className="placeholder-text">Transcript will appear here...</span>}
-                </div>
-              </div>
-            )}
-            
-            {activeTab === 'summary' && !isRecording && (
-              <div className="summary-content">
-                {isSummaryLoading ? (
-                  <div className="summary-loading">
-                    <div className="spinner"></div>
-                    <p>Generating summary and keywords with Gemini AI...</p>
+          <motion.div 
+            className="tab-content"
+            layout
+            transition={{ duration: 0.3 }}
+          >
+            <AnimatePresence mode="wait">
+              {activeTab === 'transcript' && (
+                <motion.div 
+                  className="transcription-text-container"
+                  key="transcript"
+                  variants={fadeIn}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                >
+                  <div className="transcription-header">
+                    <h3>Transcript</h3>
+                    <motion.button 
+                      className="copy-button"
+                      onClick={() => handleCopy(transcriptText, 'transcript')}
+                      disabled={!transcriptText}
+                      title="Copy transcript to clipboard"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                      {copyFeedback.type === 'transcript' && (
+                        <motion.span 
+                          className="copy-feedback"
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                        >
+                          {copyFeedback.message}
+                        </motion.span>
+                      )}
+                    </motion.button>
                   </div>
-                ) : summaryError ? (
-                  <div className="summary-error">
-                    <p>{summaryError}</p>
-                    <button onClick={handleRegenerateSummary}>Try Again</button>
+                  <div className="transcription-text">
+                    {transcriptText || <span className="placeholder-text">Transcript will appear here...</span>}
                   </div>
-                ) : (
-                  <>
-                    {keywords && keywords.length > 0 && (
-                      <div className="keywords-section">
+                </motion.div>
+              )}
+              
+              {activeTab === 'summary' && !isRecording && (
+                <motion.div 
+                  className="summary-content"
+                  key="summary"
+                  variants={fadeIn}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                >
+                  {isSummaryLoading ? (
+                    <motion.div 
+                      className="summary-loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <motion.div 
+                        className="spinner"
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                      />
+                      <p>Generating summary and keywords with Gemini AI...</p>
+                    </motion.div>
+                  ) : summaryError ? (
+                    <motion.div 
+                      className="summary-error"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <p>{summaryError}</p>
+                      <motion.button 
+                        onClick={handleRegenerateSummary}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        Try Again
+                      </motion.button>
+                    </motion.div>
+                  ) : (
+                    <>
+                      {keywords && keywords.length > 0 && (
+                        <motion.div 
+                          className="keywords-section"
+                          variants={tabVariants}
+                          initial="hidden"
+                          animate="visible"
+                          transition={{ delay: 0.1 }}
+                        >
+                          <div className="section-header">
+                            <h3>Keywords</h3>
+                            <motion.button 
+                              className="copy-button"
+                              onClick={() => handleCopy(keywords.join(', '), 'keywords')}
+                              disabled={!keywords.length}
+                              title="Copy keywords to clipboard"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                              </svg>
+                              {copyFeedback.type === 'keywords' && (
+                                <motion.span 
+                                  className="copy-feedback"
+                                  initial={{ opacity: 0, y: 5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0 }}
+                                >
+                                  {copyFeedback.message}
+                                </motion.span>
+                              )}
+                            </motion.button>
+                          </div>
+                          <div className="keywords-list">
+                            {keywords.map((keyword, index) => (
+                              <motion.button 
+                                key={index} 
+                                className="keyword-tag clickable"
+                                onClick={() => openPerplexityWithKeyword(keyword)}
+                                title={`Click to search for "${keyword}" on Perplexity AI`}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.05 * index }}
+                                whileHover={{ 
+                                  y: -4, 
+                                  boxShadow: "0 6px 10px rgba(80, 86, 224, 0.2)" 
+                                }}
+                                whileTap={{ y: 0, boxShadow: "none" }}
+                              >
+                                {keyword}
+                                <span className="keyword-icon">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                  </svg>
+                                </span>
+                              </motion.button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                      
+                      <motion.div 
+                        className="summary-section"
+                        variants={tabVariants}
+                        initial="hidden"
+                        animate="visible"
+                        transition={{ delay: 0.2 }}
+                      >
                         <div className="section-header">
-                          <h3>Keywords</h3>
-                          <button 
+                          <h3>Summary</h3>
+                          <motion.button 
                             className="copy-button"
-                            onClick={() => handleCopy(keywords.join(', '), 'keywords')}
-                            disabled={!keywords.length}
-                            title="Copy keywords to clipboard"
+                            onClick={() => handleCopy(summaryText, 'summary')}
+                            disabled={!summaryText}
+                            title="Copy summary to clipboard"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                             </svg>
-                            {copyFeedback.type === 'keywords' && (
-                              <span className="copy-feedback">{copyFeedback.message}</span>
+                            {copyFeedback.type === 'summary' && (
+                              <motion.span 
+                                className="copy-feedback"
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                              >
+                                {copyFeedback.message}
+                              </motion.span>
                             )}
-                          </button>
+                          </motion.button>
                         </div>
-                        <div className="keywords-list">
-                          {keywords.map((keyword, index) => (
-                            <button 
-                              key={index} 
-                              className="keyword-tag clickable"
-                              onClick={() => openPerplexityWithKeyword(keyword)}
-                              title={`Click to search for "${keyword}" on Perplexity AI`}
-                            >
-                              {keyword}
-                              <span className="keyword-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                                  <polyline points="15 3 21 3 21 9"></polyline>
-                                  <line x1="10" y1="14" x2="21" y2="3"></line>
-                                </svg>
-                              </span>
-                            </button>
-                          ))}
+                        <div className="summary-text">
+                          {summaryText || <span className="placeholder-text">No summary available. Click "Generate" to create one.</span>}
                         </div>
-                      </div>
-                    )}
-                    
-                    <div className="summary-section">
-                      <div className="section-header">
-                        <h3>Summary</h3>
-                        <button 
-                          className="copy-button"
-                          onClick={() => handleCopy(summaryText, 'summary')}
-                          disabled={!summaryText}
-                          title="Copy summary to clipboard"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                          </svg>
-                          {copyFeedback.type === 'summary' && (
-                            <span className="copy-feedback">{copyFeedback.message}</span>
-                          )}
-                        </button>
-                      </div>
-                      <div className="summary-text">
-                        {summaryText || <span className="placeholder-text">No summary available. Click "Generate" to create one.</span>}
-                      </div>
-                    </div>
-                    
-                    <div className="summary-actions">
-                      <button 
-                        onClick={handleRegenerateSummary}
-                        className="regenerate-button"
+                      </motion.div>
+                      
+                      <motion.div 
+                        className="summary-actions"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.4 }}
                       >
-                        Regenerate
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+                        <motion.button 
+                          onClick={handleRegenerateSummary}
+                          className="regenerate-button"
+                          whileHover={{ y: -2, boxShadow: "0 6px 12px rgba(80, 86, 224, 0.25)" }}
+                          whileTap={{ y: 0, boxShadow: "0 2px 4px rgba(80, 86, 224, 0.15)" }}
+                        >
+                          Regenerate
+                        </motion.button>
+                      </motion.div>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 };
 

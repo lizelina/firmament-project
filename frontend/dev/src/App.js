@@ -1,10 +1,38 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
 import TranscriptionMic from './components/TranscriptionMic';
 import Login from './components/Login';
 import Register from './components/Register';
 import NotebookList from './components/NotebookList';
 import NotebookDetail from './components/NotebookDetail';
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { 
+    opacity: 1,
+    transition: { duration: 0.4 }
+  },
+  exit: { 
+    opacity: 0,
+    transition: { duration: 0.3 }
+  }
+};
+
+const contentVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.4 }
+  },
+  exit: { 
+    opacity: 0, 
+    y: -20,
+    transition: { duration: 0.3 }
+  }
+};
 
 function App() {
   // Force re-render mechanism
@@ -272,73 +300,158 @@ function App() {
   
   // Show login/register page if not authenticated
   if (!isAuthenticated) {
-    return showLogin ? 
-      <Login 
-        onLoginSuccess={handleLoginSuccess} 
-        onSwitchToRegister={() => setShowLogin(false)} 
-      /> : 
-      <Register 
-        onRegisterSuccess={handleLoginSuccess} 
-        onSwitchToLogin={() => setShowLogin(true)} 
-      />;
+    return (
+      <AnimatePresence mode="wait">
+        {showLogin ? (
+          <motion.div
+            key="login"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={containerVariants}
+          >
+            <Login 
+              onLoginSuccess={handleLoginSuccess} 
+              onSwitchToRegister={() => setShowLogin(false)} 
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="register"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={containerVariants}
+          >
+            <Register 
+              onRegisterSuccess={handleLoginSuccess} 
+              onSwitchToLogin={() => setShowLogin(true)} 
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
   }
   
   // Show authenticated content
   return (
-    <div className="App">
-      <div className="app-header">
+    <motion.div 
+      className="App"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <motion.div 
+        className="app-header"
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
+      >
         <div className="header-title">
           <h1>Firmament Notebooks</h1>
           {userInfo && (
-            <div className="user-info">
+            <motion.div 
+              className="user-info"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+            >
               Welcome, {userInfo.firstName} {userInfo.lastName}
-            </div>
+            </motion.div>
           )}
         </div>
-        <button className="logout-button" onClick={handleLogout}>Logout</button>
-      </div>
+        <motion.button 
+          className="logout-button" 
+          onClick={handleLogout}
+          whileHover={{ y: -2, boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}
+          whileTap={{ y: 0, boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)" }}
+        >
+          Logout
+        </motion.button>
+      </motion.div>
 
-      <div className="app-content">
-        {/* List View */}
-        {currentView === 'list' && (
-          <NotebookList 
-            notebooks={notebooks}
-            onStartNewNotebook={handleStartNewNotebook}
-            onViewNotebook={handleViewNotebook}
-            onDeleteNotebook={handleDeleteNotebook}
-          />
-        )}
-        
-        {/* New Notebook View */}
-        {currentView === 'new' && (
-          <div>
-            <NotebookDetail
-              isNewNotebook={true}
-              userId={userId}
-              onSaveNotebook={handleSaveNotebook}
-              onBackToList={handleBackToList}
-            />
-          </div>
-        )}
-        
-        {/* View Existing Notebook */}
-        {currentView === 'view' && selectedNotebook && (
-          <NotebookDetail
-            notebook={selectedNotebook}
-            userId={userId}
-            onSaveNotebook={handleSaveNotebook}
-            onBackToList={handleBackToList}
-          />
-        )}
-      </div>
+      <motion.div 
+        className="app-content"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
+        <AnimatePresence mode="wait">
+          {/* List View */}
+          {currentView === 'list' && (
+            <motion.div
+              key="list"
+              variants={contentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <NotebookList 
+                notebooks={notebooks}
+                onStartNewNotebook={handleStartNewNotebook}
+                onViewNotebook={handleViewNotebook}
+                onDeleteNotebook={handleDeleteNotebook}
+              />
+            </motion.div>
+          )}
+          
+          {/* New Notebook View */}
+          {currentView === 'new' && (
+            <motion.div
+              key="new"
+              variants={contentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <NotebookDetail
+                isNewNotebook={true}
+                userId={userId}
+                onSaveNotebook={handleSaveNotebook}
+                onBackToList={handleBackToList}
+              />
+            </motion.div>
+          )}
+          
+          {/* View Existing Notebook */}
+          {currentView === 'view' && selectedNotebook && (
+            <motion.div
+              key="view"
+              variants={contentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <NotebookDetail
+                notebook={selectedNotebook}
+                userId={userId}
+                onSaveNotebook={handleSaveNotebook}
+                onBackToList={handleBackToList}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
       
-      {isSaving && (
-        <div className="saving-indicator">
-          <div className="saving-spinner"></div>
-          <span>Saving notebook...</span>
-        </div>
-      )}
-    </div>
+      <AnimatePresence>
+        {isSaving && (
+          <motion.div 
+            className="saving-indicator"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <motion.div 
+              className="saving-spinner"
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+            />
+            <span>Saving notebook...</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
