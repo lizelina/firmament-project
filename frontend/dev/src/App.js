@@ -146,7 +146,7 @@ function App() {
     setSelectedNotebook(null);
   };
 
-  const handleSaveNotebook = async (notebookData, successMessage, stayOnPage = false) => {
+  const handleSaveNotebook = async (notebookData) => {
     // Only save if there's actual content in either notes or transcript
     if ((!notebookData.noteText || notebookData.noteText.trim() === '') &&
         (!notebookData.curTranscript || notebookData.curTranscript.trim() === '')) {
@@ -188,41 +188,31 @@ function App() {
       if (result.success) {
         // If save was successful, fetch latest notebooks
         await fetchUserNotebooks(userId);
-        
-        // Show success message if provided and not null
-        if (successMessage) {
-          alert(successMessage);
+
+        // Update the selectedNotebook to make sure it shows the latest content
+        if (notebookData.noteId) {
+          const updatedNotebook = {
+            ...notebookData,
+            _id: notebookData.noteId,
+            updatedAt: new Date().toISOString()
+          };
+          setSelectedNotebook(updatedNotebook);
         }
-        
-        if (!stayOnPage) {
-          // Add a small delay before navigating back to list
-          setTimeout(() => {
-            setCurrentView('list');
-          }, 500);
-        } else {
-          // If we're staying on the same page, update the selectedNotebook
-          // to make sure it shows the latest content
-          if (notebookData.noteId) {
-            const updatedNotebook = {
-              ...notebookData,
-              _id: notebookData.noteId,
-              updatedAt: new Date().toISOString()
-            };
-            setSelectedNotebook(updatedNotebook);
-          }
-        }
-        
+
         // Return the noteId (either the existing one or the new one from the result)
         return result.noteId || notebookData.noteId;
+
       } else {
         console.error('Error saving notebook:', result.message);
         alert(`Failed to save notebook: ${result.message}`);
         return null;
       }
+
     } catch (error) {
       console.error('Error saving notebook:', error);
       alert(`Error saving notebook: ${error.message}`);
       return null;
+      
     } finally {
       setIsSaving(false);
     }

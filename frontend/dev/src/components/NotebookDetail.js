@@ -15,10 +15,12 @@ const NotebookDetail = ({
   onBackToList, 
   isNewNotebook = false 
 }) => {
+
   // Track both the current recording state and whether we ever had text
   const [isRecording, setIsRecording] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [transcriptText, setTranscriptText] = useState('');
+  const [transcriptDuration, setTranscriptDuration] = useState(0);
   const [hasTranscript, setHasTranscript] = useState(false);
   const [status, setStatus] = useState('');
   const [title, setTitle] = useState(isNewNotebook ? 'New Note' : notebook?.title || 'Untitled');
@@ -44,14 +46,70 @@ const NotebookDetail = ({
   // Track recording start time
   const recordingStartTimeRef = useRef(null);
   
+  // Consistent timeout for status messages
+  const STATUS_TIMEOUT = 2000;
+
+  // Unified entrance to save the notebook
+  const saveNotebook = async (context = '') => {
+    // Don't save if user ID is missing
+    if (!userId) {
+      console.error("Cannot save note: No userId provided");
+      setStatus(`Error: No user ID provided`);
+      setTimeout(() => setStatus(""), STATUS_TIMEOUT);
+      return null;
+    }
+    
+    // Prepare the notebook data
+    const notebookData = {
+      userId: userId,
+      noteId: lastSavedNoteId.current || notebook?._id || null,
+      title: title || `Note ${new Date().toLocaleDateString()}`,
+      noteText: noteText || '',
+      curTranscript: transcriptText || '',
+      curSummary: summaryText ? JSON.stringify({
+        summary: summaryText,
+        keywords: keywords || []
+      }) : '',
+      date: new Date().toISOString(),
+      duration: transcriptDuration || notebook?.duration || 0
+    };
+
+    // Show saving status with context if provided
+    setStatus(`Saving${context ? ' ' + context : ''}...`);
+    
+    try {
+      // Mark as recently saved to prevent duplicate saves
+      setRecentlySaved(true);
+      
+      // Send to parent component to save
+      const noteId = await onSaveNotebook(notebookData);
+      
+      if (noteId) {
+        lastSavedNoteId.current = noteId;
+        setStatus(`Saved${context ? ' ' + context : ''} successfully`);
+        setTimeout(() => setStatus(""), STATUS_TIMEOUT);
+        return noteId;
+      } else {
+        throw new Error("Failed to get note ID from save operation");
+      }
+    } catch (error) {
+      console.error(`Error saving${context ? ' ' + context : ''}:`, error);
+      setStatus(`Error saving${context ? ' ' + context : ''}: ${error.message || 'Unknown error'}`);
+      setTimeout(() => setStatus(""), STATUS_TIMEOUT);
+      return null;
+    }
+  };
+  
   // Set initial note and transcript content if viewing an existing one
   useEffect(() => {
     if (!isNewNotebook && notebook) {
       const initialText = notebook?.noteText || notebook?.originalText || notebook?.text || '';
       const initialTranscript = notebook?.curTranscript || '';
+      const initialDuration = notebook?.duration || 0;
       
       setNoteText(initialText);
       setTranscriptText(initialTranscript);
+      setTranscriptDuration(initialDuration);
       setTitle(notebook?.title || 'Untitled');
       lastSavedNoteId.current = notebook?._id || null;
       
@@ -90,23 +148,8 @@ const NotebookDetail = ({
       
       // If we have a note ID, clear the summary in the database
       if (lastSavedNoteId.current) {
-        // Prepare data with empty summary
-        const notebookData = {
-          userId: userId,
-          noteId: lastSavedNoteId.current,
-          title: title,
-          noteText: noteText,
-          originalText: noteText,
-          text: noteText,
-          curTranscript: transcriptText,
-          curSummary: '', // Clear summary
-          date: notebook?.date || new Date().toISOString(),
-          duration: notebook?.duration || 0
-        };
-        
-        // Update the note in the database with empty summary
-        console.log("🧹 [NotebookDetail] Clearing summary in database");
-        onSaveNotebook(notebookData, null, true);
+        // Clear summary
+        saveNotebook('cleared summary');
       }
       
       // Set start time when recording begins
@@ -119,6 +162,7 @@ const NotebookDetail = ({
       if (recordingStartTimeRef.current) {
         const endTime = new Date();
         const durationSeconds = Math.round((endTime - recordingStartTimeRef.current) / 1000);
+        setTranscriptDuration(durationSeconds);
         console.log(`📊 [NotebookDetail] Recording ended, duration: ${durationSeconds} seconds`);
       }
     }
@@ -189,38 +233,10 @@ const NotebookDetail = ({
       setSummaryText(summaryResult);
       setKeywords(keywordsList);
       
-      // Save the summary and keywords with the note - Automatically
-      const summaryPayload = {
-        summary: summaryResult,
-        keywords: keywordsList
-      };
-      
-      // Prepare data for saving
-      const notebookData = {
-        userId: userId,
-        noteId: lastSavedNoteId.current || notebook?._id || null,
-        title: title,
-        noteText: noteText,
-        originalText: noteText,
-        text: noteText,
-        curTranscript: transcriptText,
-        curSummary: JSON.stringify(summaryPayload),
-        date: notebook?.date || new Date().toISOString(),
-        duration: notebook?.duration || 0
-      };
-      
       // Automatically save the summary data
-      if (notebookData.noteId) {
+      if (lastSavedNoteId.current) {
         console.log("Automatically saving summary and keywords");
-        setStatus("Saving summary...");
-        onSaveNotebook(notebookData, null, true).then(noteId => {
-          if (noteId) {
-            lastSavedNoteId.current = noteId;
-            setStatus("Summary saved");
-            // Clear status after a few seconds
-            setTimeout(() => setStatus(""), 2000);
-          }
-        });
+        saveNotebook('summary');
       }
     } catch (error) {
       console.error('Error generating summary:', error);
@@ -302,44 +318,19 @@ const NotebookDetail = ({
     
     // Reset recording start time reference
     recordingStartTimeRef.current = null;
-  
-    // When complete transcript is ready, prepare data for saving
-    const notebookData = {
-      userId: userId,
-      noteId: lastSavedNoteId.current || notebook?._id || null,
-      title: title || `Note ${new Date().toLocaleDateString()}`,
-      noteText: noteText || '',
-      originalText: noteText || '', // For compatibility 
-      text: noteText || '', // For compatibility
-      curTranscript: completeTranscript.text || '',
-      curSummary: '',
-      date: completeTranscript.date || new Date().toISOString(),
-      duration: completeTranscript.duration || calculateCurrentDuration() || 0
-    };
+    
+    // When complete transcript is ready, update state variables
+    setTranscriptText(completeTranscript.text || '');
+    setTranscriptDuration(completeTranscript.duration || calculateCurrentDuration() || 0);
     
     // Log the duration being saved
-    console.log(`📊 [NotebookDetail] Saving transcript with duration: ${notebookData.duration} seconds`);
-    
-    // Determine if we should stay on the page after saving
-    const shouldStayOnPage = true;
+    console.log(`📊 [NotebookDetail] Saving transcript with duration: ${completeTranscript.duration || calculateCurrentDuration() || 0} seconds`);
     
     // Mark as recently saved to prevent duplicate saves
     setRecentlySaved(true);
     
-    // Show status
-    setStatus("Saving transcript...");
-    
-    // Send to parent component to save (without alert message)
-    onSaveNotebook(notebookData, null, shouldStayOnPage).then(noteId => {
-      if (noteId) {
-        lastSavedNoteId.current = noteId;
-        setStatus("Transcript saved");
-        setTimeout(() => setStatus(""), 2000);
-      } else {
-        setStatus("Error saving transcript");
-        setTimeout(() => setStatus(""), 2000);
-      }
-    });
+    // Save the notebook with context
+    saveNotebook('transcript');
   };
 
   const handleNoteChange = (e) => {
@@ -385,32 +376,8 @@ const NotebookDetail = ({
       return;
     }
     
-    // Save the updated title
-    const notebookData = {
-      userId: userId,
-      noteId: lastSavedNoteId.current,
-      title: title,
-      // Keep other fields the same
-      noteText: noteText,
-      curTranscript: transcriptText || '',
-      curSummary: notebook?.curSummary || '',
-      date: notebook?.date || new Date().toISOString(),
-      duration: notebook?.duration || 0
-    };
-    
-    // Show saving status
-    setStatus("Saving title...");
-    
-    // Auto-save the title change
-    try {
-      await onSaveNotebook(notebookData, null, true);
-      setStatus("Title saved");
-      setTimeout(() => setStatus(""), 2000);
-    } catch (error) {
-      console.error("Error saving title:", error);
-      setStatus("Error saving title");
-      setTimeout(() => setStatus(""), 2000);
-    }
+    // Save the notebook with title context
+    saveNotebook('title');
   };
   
   // Handle keyboard events on title input
@@ -442,124 +409,14 @@ const NotebookDetail = ({
     return durationSeconds;
   };
   
-  const handleSaveNote = async () => {
-    // If recording is active, we need to handle recording stop first
-    if (isRecording) {
-      // No need for a separate confirmation dialog - just inform the user what's happening
-      setStatus("Stopping recording and saving notebook...");
-      
-      // Calculate duration before stopping recording
-      const currentDuration = calculateCurrentDuration();
-      
-      // Force stop recording via TranscriptionMic
-      setIsRecording(false);
-      
-      // Small delay to allow TranscriptionMic to properly close connections
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // If we don't have any content yet, don't save
-      if (!transcriptText.trim() && !noteText.trim()) {
-        setStatus("Nothing to save yet");
-        setTimeout(() => setStatus(""), 2000);
-        return;
-      }
-      
-      // Directly proceed to saving without additional confirmations
-      const notebookData = {
-        userId: userId,
-        noteId: lastSavedNoteId.current || notebook?._id || null,
-        title: title || `Note ${new Date().toLocaleDateString()}`,
-        noteText: noteText,
-        originalText: noteText, // For compatibility
-        text: noteText, // For compatibility
-        curTranscript: transcriptText || '', // Include current transcript
-        curSummary: '', // Clear summary since we're stopping mid-recording
-        date: new Date().toISOString(),
-        duration: currentDuration // Use calculated duration
-      };
-      
-      if (!userId) {
-        console.error("Cannot save note: No userId provided");
-        alert("Cannot save note: No user ID provided");
-        return;
-      }
-      
-      // Show saving indicator
-      setStatus("Saving notebook...");
-      
-      // Mark as recently saved
-      setRecentlySaved(true);
-      
-      try {
-        // Force stayOnPage to be false to ensure navigation
-        const noteId = await onSaveNotebook(notebookData, null, false);
-        
-        if (noteId) {
-          lastSavedNoteId.current = noteId;
-          // Navigation will happen automatically through onSaveTranscript
-        } else {
-          // In case of error, show a message
-          setStatus("Error saving notebook");
-          setTimeout(() => setStatus(""), 2000);
-        }
-      } catch (error) {
-        console.error("Error saving notebook:", error);
-        setStatus("Error saving notebook: " + error.message);
-        setTimeout(() => setStatus(""), 3000);
-      }
-      
-      return;
-    }
-    
-    // If we're not recording, handle normal save
-    
+  const handleManualSave = async () => {
     // If we just saved from stopping the recording and haven't changed anything, skip the save
     if (recentlySaved && !isRecording) {
-      // Just navigate back without saving again
-      onBackToList();
       return;
     }
     
-    // Save the current note without new transcription
-    const notebookData = {
-      userId: userId,
-      noteId: lastSavedNoteId.current || notebook?._id || null,
-      title: title || `Note ${new Date().toLocaleDateString()}`,
-      noteText: noteText,
-      originalText: noteText, // For compatibility
-      text: noteText, // For compatibility
-      curTranscript: transcriptText || '', // Include current transcript
-      curSummary: summaryText ? JSON.stringify({
-        summary: summaryText,
-        keywords: keywords || []
-      }) : '',
-      date: new Date().toISOString(),
-      duration: notebook?.duration || 0 // No duration for manual save
-    };
-    
-    if (!userId) {
-      console.error("Cannot save note: No userId provided");
-      alert("Cannot save note: No user ID provided");
-      return;
-    }
-    
-    // Show a temporary saving indicator
-    setStatus("Saving notebook...");
-    
-    // Mark as recently saved
-    setRecentlySaved(true);
-    
-    try {
-      // Force stayOnPage to be false to ensure navigation
-      const noteId = await onSaveNotebook(notebookData, null, false);
-      if (noteId) {
-        lastSavedNoteId.current = noteId;
-      }
-    } catch (error) {
-      console.error("Error saving notebook:", error);
-      setStatus("Error saving notebook: " + error.message);
-      setTimeout(() => setStatus(""), 3000);
-    }
+    // Save the current note
+    saveNotebook('notebook');
   };
 
   // Handle going back to the list - forcibly stop recording
@@ -576,6 +433,9 @@ const NotebookDetail = ({
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     
+    // Save the notebook before navigating away
+    saveNotebook('before home');
+
     // Navigate back to the list without saving
     onBackToList();
   };
@@ -688,7 +548,7 @@ const NotebookDetail = ({
           
           <button 
             className="save-button" 
-            onClick={handleSaveNote}
+            onClick={handleManualSave}
           >
             Save
           </button>
@@ -789,8 +649,8 @@ const NotebookDetail = ({
                   <div className="summary-error">
                     <p>{summaryError}</p>
                     <button onClick={handleRegenerateSummary}>Try Again</button>
-        </div>
-      ) : (
+                  </div>
+                ) : (
                   <>
                     {keywords && keywords.length > 0 && (
                       <div className="keywords-section">
@@ -826,7 +686,7 @@ const NotebookDetail = ({
                                   <polyline points="15 3 21 3 21 9"></polyline>
                                   <line x1="10" y1="14" x2="21" y2="3"></line>
                                 </svg>
-              </span>
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -850,12 +710,12 @@ const NotebookDetail = ({
                             <span className="copy-feedback">{copyFeedback.message}</span>
                           )}
                         </button>
-            </div>
+                      </div>
                       <div className="summary-text">
                         {summaryText || <span className="placeholder-text">No summary available. Click "Generate" to create one.</span>}
-            </div>
-          </div>
-          
+                      </div>
+                    </div>
+                    
                     <div className="summary-actions">
                       <button 
                         onClick={handleRegenerateSummary}
