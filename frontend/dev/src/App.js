@@ -3,8 +3,8 @@ import './App.css';
 import TranscriptionMic from './components/TranscriptionMic';
 import Login from './components/Login';
 import Register from './components/Register';
-import TranscriptList from './components/TranscriptList';
-import TranscriptDetail from './components/TranscriptDetail';
+import NoteList from './components/NoteList';
+import NoteDetail from './components/NoteDetail';
 
 function App() {
   // Authentication states
@@ -13,10 +13,10 @@ function App() {
   const [userInfo, setUserInfo] = useState(null);
   const [showLogin, setShowLogin] = useState(true);
   
-  // Transcript states
-  const [transcripts, setTranscripts] = useState([]);
+  // Note states
+  const [notes, setNotes] = useState([]);
   const [currentView, setCurrentView] = useState('list'); // 'list', 'new', 'view'
-  const [selectedTranscript, setSelectedTranscript] = useState(null);
+  const [selectedNote, setSelectedNote] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   
   // Check if user is already authenticated
@@ -36,22 +36,22 @@ function App() {
         email: localStorage.getItem('userEmail') || ''
       });
 
-      // Fetch transcripts from database
-      fetchUserTranscripts(storedUserId);
+      // Fetch notes from database
+      fetchUserNotes(storedUserId);
     } else if (authenticated && !storedUserId) {
       // If authenticated but no userId, force logout
       handleLogout();
     }
   }, []);
 
-  // Fetch user transcripts from the server
-  const fetchUserTranscripts = async (userId) => {
+  // Fetch user notes from the server
+  const fetchUserNotes = async (userId) => {
     try {
-      const response = await fetch(`http://localhost:8000/transcripts/${userId}`);
+      const response = await fetch(`http://localhost:8000/userdata/${userId}`);
       
       if (!response.ok) {
         // Handle HTTP errors
-        console.error(`Error fetching transcripts: HTTP ${response.status}`);
+        console.error(`Error fetching notes: HTTP ${response.status}`);
         return;
       }
       
@@ -64,17 +64,17 @@ function App() {
         return;
       }
       
-      if (data.success && Array.isArray(data.transcripts)) {
-        setTranscripts(data.transcripts);
+      if (data.success && Array.isArray(data.notes)) {
+        setNotes(data.notes);
       } else {
-        console.error('Failed to fetch transcripts:', data.message || 'Unknown error');
+        console.error('Failed to fetch notes:', data.message || 'Unknown error');
         // Initialize with empty array if no data
-        setTranscripts([]);
+        setNotes([]);
       }
     } catch (error) {
-      console.error('Error fetching transcripts:', error);
+      console.error('Error fetching notes:', error);
       // Initialize with empty array on error
-      setTranscripts([]);
+      setNotes([]);
     }
   };
 
@@ -89,8 +89,8 @@ function App() {
       email: localStorage.getItem('userEmail') || ''
     });
 
-    // Fetch transcripts from database
-    fetchUserTranscripts(userId);
+    // Fetch notes from database
+    fetchUserNotes(userId);
   };
 
   const handleLogout = () => {
@@ -106,70 +106,64 @@ function App() {
     setUserId(null);
     setUserInfo(null);
     setShowLogin(true);
-    setTranscripts([]);
+    setNotes([]);
     setCurrentView('list');
-    setSelectedTranscript(null);
+    setSelectedNote(null);
   };
 
-  const handleStartNewTranscription = () => {
+  const handleStartNewNote = () => {
     setCurrentView('new');
   };
 
-  const handleViewTranscript = (transcriptId) => {
-    const transcript = transcripts.find(t => t._id === transcriptId);
-    if (transcript) {
-      setSelectedTranscript(transcript);
+  const handleViewNote = (noteId) => {
+    const note = notes.find(n => n._id === noteId);
+    if (note) {
+      setSelectedNote(note);
       setCurrentView('view');
     }
   };
 
   const handleBackToList = () => {
     setCurrentView('list');
-    setSelectedTranscript(null);
+    setSelectedNote(null);
   };
 
-  const handleSaveTranscript = async (completeTranscript) => {
+  const handleSaveNote = async (noteData) => {
     // Only save if there's actual content
-    if (!completeTranscript.text || completeTranscript.text.trim() === '') {
+    if (!noteData.title || !noteData.noteText) {
       return;
     }
     
     setIsSaving(true);
     
     try {
-      // Convert the transcript object to MongoDB format
-      const transcriptData = {
-        userId: userId,
-        title: completeTranscript.title || `Note ${new Date().toLocaleDateString()}`,
-        originalText: completeTranscript.text,
-        date: completeTranscript.date, // Already in ISO format
-        duration: completeTranscript.duration // Already in seconds
-      };
-      
-      // Save to MongoDB
-      const response = await fetch('http://localhost:8000/transcripts', {
+      // Save to MongoDB using the userdata endpoint
+      const response = await fetch('http://localhost:8000/userdata', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(transcriptData),
+        body: JSON.stringify(noteData),
       });
       
       const result = await response.json();
       
       if (result.success) {
-        // Fetch latest transcripts after successful save
-        await fetchUserTranscripts(userId);
+        // Fetch latest notes after successful save
+        await fetchUserNotes(userId);
         
-        // Add a small delay before navigating back to list
-        setTimeout(() => {
-          setCurrentView('list');
-        }, 500);
+        // Return success with the note ID
+        return {
+          success: true,
+          noteId: result.noteId
+        };
       } else {
-        console.error('Error saving transcript:', result.message);
+        console.error('Error saving note:', result.message);
+        throw new Error(result.message || 'Failed to save note');
       }
     } catch (error) {
-      console.error('Error saving transcript:', error);
+      console.error('Error saving note:', error);
+      throw error;
     } finally {
       setIsSaving(false);
     }
@@ -193,7 +187,7 @@ function App() {
     <div className="App">
       <div className="app-header">
         <div className="header-title">
-          <h1>Captions by Deepgram</h1>
+          <h1>Smart Notes</h1>
           {userInfo && (
             <div className="user-info">
               Welcome, {userInfo.firstName} {userInfo.lastName}
@@ -205,26 +199,27 @@ function App() {
 
       <div className="app-content">
         {currentView === 'list' && (
-          <TranscriptList 
-            transcripts={transcripts}
-            onStartNewTranscription={handleStartNewTranscription}
-            onViewTranscript={handleViewTranscript}
+          <NoteList 
+            notes={notes}
+            onStartNewNote={handleStartNewNote}
+            onViewNote={handleViewNote}
           />
         )}
         
         {currentView === 'new' && (
-          <TranscriptDetail
-            isNewTranscription={true}
+          <NoteDetail
+            isNewNote={true}
             userId={userId}
-            onSaveTranscript={handleSaveTranscript}
+            onSaveNote={handleSaveNote}
             onBackToList={handleBackToList}
           />
         )}
         
-        {currentView === 'view' && selectedTranscript && (
-          <TranscriptDetail
-            transcript={selectedTranscript}
+        {currentView === 'view' && selectedNote && (
+          <NoteDetail
+            note={selectedNote}
             userId={userId}
+            onSaveNote={handleSaveNote}
             onBackToList={handleBackToList}
           />
         )}
@@ -233,7 +228,7 @@ function App() {
       {isSaving && (
         <div className="saving-indicator">
           <div className="saving-spinner"></div>
-          <span>Saving transcript...</span>
+          <span>Saving note...</span>
         </div>
       )}
     </div>
