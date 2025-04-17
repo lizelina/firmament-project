@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import './Login.css'; // Reuse the login styles
 
 const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
@@ -73,12 +74,38 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
 
   return (
     <div className="login-container">
-      <div className="login-form-wrapper">
-        <h1>Create an Account</h1>
+      <motion.div 
+        className="login-form-wrapper"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <motion.h1
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+        >
+          Create an Account
+        </motion.h1>
+        
         <form className="login-form" onSubmit={handleSubmit}>
-          {error && <div className="error-message">{error}</div>}
+          {error && (
+            <motion.div 
+              className="error-message"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {error}
+            </motion.div>
+          )}
           
-          <div className="form-group">
+          <motion.div 
+            className="form-group"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+          >
             <label htmlFor="firstName">First Name*</label>
             <input
               type="text"
@@ -88,9 +115,14 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
               required
               placeholder="Enter your first name"
             />
-          </div>
+          </motion.div>
           
-          <div className="form-group">
+          <motion.div 
+            className="form-group"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.4 }}
+          >
             <label htmlFor="lastName">Last Name</label>
             <input
               type="text"
@@ -99,9 +131,14 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
               onChange={(e) => setLastName(e.target.value)}
               placeholder="Enter your last name"
             />
-          </div>
+          </motion.div>
           
-          <div className="form-group">
+          <motion.div 
+            className="form-group"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.4 }}
+          >
             <label htmlFor="email">Email*</label>
             <input
               type="email"
@@ -112,9 +149,14 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
               placeholder="Enter your email"
               autoComplete="email"
             />
-          </div>
+          </motion.div>
           
-          <div className="form-group">
+          <motion.div 
+            className="form-group"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.4 }}
+          >
             <label htmlFor="password">Password*</label>
             <input
               type="password"
@@ -125,9 +167,14 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
               placeholder="Create a password"
               autoComplete="new-password"
             />
-          </div>
+          </motion.div>
           
-          <div className="form-group">
+          <motion.div 
+            className="form-group"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.4 }}
+          >
             <label htmlFor="confirmPassword">Confirm Password*</label>
             <input
               type="password"
@@ -138,23 +185,33 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
               placeholder="Confirm your password"
               autoComplete="new-password"
             />
-          </div>
+          </motion.div>
           
-          <button 
+          <motion.button 
             type="submit" 
             className="login-button" 
             disabled={loading}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 0.4 }}
+            whileHover={{ y: -2, boxShadow: "0 6px 12px rgba(80, 86, 224, 0.25)" }}
+            whileTap={{ y: 0, boxShadow: "0 2px 4px rgba(80, 86, 224, 0.15)" }}
           >
             {loading ? 'Creating Account...' : 'Register'}
-          </button>
+          </motion.button>
           
-          <div className="login-help">
+          <motion.div 
+            className="login-help"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9, duration: 0.4 }}
+          >
             <p>Already have an account? <a href="#" onClick={(e) => { e.preventDefault(); onSwitchToLogin(); }}>Login</a></p>
-          </div>
+          </motion.div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };
 
-export default Register; 
+export default Register;

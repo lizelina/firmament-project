@@ -2,26 +2,40 @@ import React, { useState, useEffect, useRef } from 'react';
 import TranscriptionMic from './TranscriptionMic';
 import { GEMINI_API_KEY } from '../config/api-keys';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { motion, AnimatePresence } from 'framer-motion';
 import './NotebookDetail.css';
 
 // Initialize the Generative AI model
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
+// Animation variants
+const fadeIn = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.4 } }
+};
+
+const tabVariants = {
+  hidden: { y: 10, opacity: 0 },
+  visible: { y: 0, opacity: 1, transition: { duration: 0.3 } }
+};
+
 const NotebookDetail = ({ 
-  transcript, 
+  notebook, 
   userId, 
-  onSaveTranscript, 
+  onSaveNotebook, 
   onBackToList, 
-  isNewTranscription = false 
+  isNewNotebook = false 
 }) => {
+
   // Track both the current recording state and whether we ever had text
   const [isRecording, setIsRecording] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [transcriptText, setTranscriptText] = useState('');
+  const [transcriptDuration, setTranscriptDuration] = useState(0);
   const [hasTranscript, setHasTranscript] = useState(false);
   const [status, setStatus] = useState('');
-  const [title, setTitle] = useState(isNewTranscription ? 'New Note' : transcript?.title || 'Untitled');
+  const [title, setTitle] = useState(isNewNotebook ? 'New Note' : notebook?.title || 'Untitled');
   const [activeTab, setActiveTab] = useState('transcript'); // 'transcript' or 'summary'
   
   // Flag to track if a transcript was just saved (to prevent double saves)
@@ -44,16 +58,72 @@ const NotebookDetail = ({
   // Track recording start time
   const recordingStartTimeRef = useRef(null);
   
+  // Consistent timeout for status messages
+  const STATUS_TIMEOUT = 2000;
+
+  // Unified entrance to save the notebook
+  const saveNotebook = async (context = '') => {
+    // Don't save if user ID is missing
+    if (!userId) {
+      console.error("Cannot save note: No userId provided");
+      setStatus(`Error: No user ID provided`);
+      setTimeout(() => setStatus(""), STATUS_TIMEOUT);
+      return null;
+    }
+    
+    // Prepare the notebook data
+    const notebookData = {
+      userId: userId,
+      noteId: lastSavedNoteId.current || notebook?._id || null,
+      title: title || `Note ${new Date().toLocaleDateString()}`,
+      noteText: noteText || '',
+      curTranscript: transcriptText || '',
+      curSummary: summaryText ? JSON.stringify({
+        summary: summaryText,
+        keywords: keywords || []
+      }) : '',
+      date: new Date().toISOString(),
+      duration: transcriptDuration || notebook?.duration || 0
+    };
+
+    // Show saving status with context if provided
+    setStatus(`Saving${context ? ' ' + context : ''}...`);
+    
+    try {
+      // Mark as recently saved to prevent duplicate saves
+      setRecentlySaved(true);
+      
+      // Send to parent component to save
+      const noteId = await onSaveNotebook(notebookData);
+      
+      if (noteId) {
+        lastSavedNoteId.current = noteId;
+        setStatus(`Saved${context ? ' ' + context : ''} successfully`);
+        setTimeout(() => setStatus(""), STATUS_TIMEOUT);
+        return noteId;
+      } else {
+        throw new Error("Failed to get note ID from save operation");
+      }
+    } catch (error) {
+      console.error(`Error saving${context ? ' ' + context : ''}:`, error);
+      setStatus(`Error saving${context ? ' ' + context : ''}: ${error.message || 'Unknown error'}`);
+      setTimeout(() => setStatus(""), STATUS_TIMEOUT);
+      return null;
+    }
+  };
+  
   // Set initial note and transcript content if viewing an existing one
   useEffect(() => {
-    if (!isNewTranscription && transcript) {
-      const initialText = transcript?.noteText || transcript?.originalText || transcript?.text || '';
-      const initialTranscript = transcript?.curTranscript || '';
+    if (!isNewNotebook && notebook) {
+      const initialText = notebook?.noteText || notebook?.originalText || notebook?.text || '';
+      const initialTranscript = notebook?.curTranscript || '';
+      const initialDuration = notebook?.duration || 0;
       
       setNoteText(initialText);
       setTranscriptText(initialTranscript);
-      setTitle(transcript?.title || 'Untitled');
-      lastSavedNoteId.current = transcript?._id || null;
+      setTranscriptDuration(initialDuration);
+      setTitle(notebook?.title || 'Untitled');
+      lastSavedNoteId.current = notebook?._id || null;
       
       // If there's transcript text, mark that we have a transcript
       if (initialTranscript && initialTranscript.trim() !== '') {
@@ -61,21 +131,21 @@ const NotebookDetail = ({
       }
       
       // Load existing summary and keywords if available
-      if (transcript?.curSummary) {
+      if (notebook?.curSummary) {
         try {
-          const summaryData = JSON.parse(transcript.curSummary);
+          const summaryData = JSON.parse(notebook.curSummary);
           setSummaryText(summaryData.summary || '');
           setKeywords(summaryData.keywords || []);
         } catch (e) {
           // If it's not JSON, treat it as just summary text
-          setSummaryText(transcript.curSummary);
+          setSummaryText(notebook.curSummary);
         }
       }
       
       // Always start in transcript tab when viewing a notebook
       setActiveTab('transcript');
     }
-  }, [transcript, isNewTranscription]);
+  }, [notebook, isNewNotebook]);
 
   // Reset to transcript tab when recording state changes
   useEffect(() => {
@@ -90,23 +160,8 @@ const NotebookDetail = ({
       
       // If we have a note ID, clear the summary in the database
       if (lastSavedNoteId.current) {
-        // Prepare data with empty summary
-        const notebookData = {
-          userId: userId,
-          noteId: lastSavedNoteId.current,
-          title: title,
-          noteText: noteText,
-          originalText: noteText,
-          text: noteText,
-          curTranscript: transcriptText,
-          curSummary: '', // Clear summary
-          date: transcript?.date || new Date().toISOString(),
-          duration: transcript?.duration || 0
-        };
-        
-        // Update the note in the database with empty summary
-        console.log("🧹 [NotebookDetail] Clearing summary in database");
-        onSaveTranscript(notebookData, null, true);
+        // Clear summary
+        saveNotebook('cleared summary');
       }
       
       // Set start time when recording begins
@@ -119,6 +174,7 @@ const NotebookDetail = ({
       if (recordingStartTimeRef.current) {
         const endTime = new Date();
         const durationSeconds = Math.round((endTime - recordingStartTimeRef.current) / 1000);
+        setTranscriptDuration(durationSeconds);
         console.log(`📊 [NotebookDetail] Recording ended, duration: ${durationSeconds} seconds`);
       }
     }
@@ -189,38 +245,10 @@ const NotebookDetail = ({
       setSummaryText(summaryResult);
       setKeywords(keywordsList);
       
-      // Save the summary and keywords with the note - Automatically
-      const summaryPayload = {
-        summary: summaryResult,
-        keywords: keywordsList
-      };
-      
-      // Prepare data for saving
-      const notebookData = {
-        userId: userId,
-        noteId: lastSavedNoteId.current || transcript?._id || null,
-        title: title,
-        noteText: noteText,
-        originalText: noteText,
-        text: noteText,
-        curTranscript: transcriptText,
-        curSummary: JSON.stringify(summaryPayload),
-        date: transcript?.date || new Date().toISOString(),
-        duration: transcript?.duration || 0
-      };
-      
       // Automatically save the summary data
-      if (notebookData.noteId) {
+      if (lastSavedNoteId.current) {
         console.log("Automatically saving summary and keywords");
-        setStatus("Saving summary...");
-        onSaveTranscript(notebookData, null, true).then(noteId => {
-          if (noteId) {
-            lastSavedNoteId.current = noteId;
-            setStatus("Summary saved");
-            // Clear status after a few seconds
-            setTimeout(() => setStatus(""), 2000);
-          }
-        });
+        saveNotebook('summary');
       }
     } catch (error) {
       console.error('Error generating summary:', error);
@@ -302,44 +330,19 @@ const NotebookDetail = ({
     
     // Reset recording start time reference
     recordingStartTimeRef.current = null;
-  
-    // When complete transcript is ready, prepare data for saving
-    const notebookData = {
-      userId: userId,
-      noteId: lastSavedNoteId.current || transcript?._id || null,
-      title: title || `Note ${new Date().toLocaleDateString()}`,
-      noteText: noteText || '',
-      originalText: noteText || '', // For compatibility 
-      text: noteText || '', // For compatibility
-      curTranscript: completeTranscript.text || '',
-      curSummary: '',
-      date: completeTranscript.date || new Date().toISOString(),
-      duration: completeTranscript.duration || calculateCurrentDuration() || 0
-    };
+    
+    // When complete transcript is ready, update state variables
+    setTranscriptText(completeTranscript.text || '');
+    setTranscriptDuration(completeTranscript.duration || calculateCurrentDuration() || 0);
     
     // Log the duration being saved
-    console.log(`📊 [NotebookDetail] Saving transcript with duration: ${notebookData.duration} seconds`);
-    
-    // Determine if we should stay on the page after saving
-    const shouldStayOnPage = true;
+    console.log(`📊 [NotebookDetail] Saving transcript with duration: ${completeTranscript.duration || calculateCurrentDuration() || 0} seconds`);
     
     // Mark as recently saved to prevent duplicate saves
     setRecentlySaved(true);
     
-    // Show status
-    setStatus("Saving transcript...");
-    
-    // Send to parent component to save (without alert message)
-    onSaveTranscript(notebookData, null, shouldStayOnPage).then(noteId => {
-      if (noteId) {
-        lastSavedNoteId.current = noteId;
-        setStatus("Transcript saved");
-        setTimeout(() => setStatus(""), 2000);
-      } else {
-        setStatus("Error saving transcript");
-        setTimeout(() => setStatus(""), 2000);
-      }
-    });
+    // Save the notebook with context
+    saveNotebook('transcript');
   };
 
   const handleNoteChange = (e) => {
@@ -376,41 +379,17 @@ const NotebookDetail = ({
     
     // Don't save if title is empty, revert to previous or default title
     if (!title.trim()) {
-      setTitle(transcript?.title || 'Untitled');
+      setTitle(notebook?.title || 'Untitled');
       return;
     }
     
     // If we don't have a note ID yet or title hasn't changed, don't save
-    if (!lastSavedNoteId.current || title === transcript?.title) {
+    if (!lastSavedNoteId.current || title === notebook?.title) {
       return;
     }
     
-    // Save the updated title
-    const notebookData = {
-      userId: userId,
-      noteId: lastSavedNoteId.current,
-      title: title,
-      // Keep other fields the same
-      noteText: noteText,
-      curTranscript: transcriptText || '',
-      curSummary: transcript?.curSummary || '',
-      date: transcript?.date || new Date().toISOString(),
-      duration: transcript?.duration || 0
-    };
-    
-    // Show saving status
-    setStatus("Saving title...");
-    
-    // Auto-save the title change
-    try {
-      await onSaveTranscript(notebookData, null, true);
-      setStatus("Title saved");
-      setTimeout(() => setStatus(""), 2000);
-    } catch (error) {
-      console.error("Error saving title:", error);
-      setStatus("Error saving title");
-      setTimeout(() => setStatus(""), 2000);
-    }
+    // Save the notebook with title context
+    saveNotebook('title');
   };
   
   // Handle keyboard events on title input
@@ -423,7 +402,7 @@ const NotebookDetail = ({
     // Cancel on Escape key
     if (e.key === 'Escape') {
       e.preventDefault();
-      setTitle(transcript?.title || 'Untitled');
+      setTitle(notebook?.title || 'Untitled');
       setIsEditingTitle(false);
     }
   };
@@ -432,7 +411,7 @@ const NotebookDetail = ({
   const calculateCurrentDuration = () => {
     if (!recordingStartTimeRef.current) {
       // Use existing duration if available
-      return transcript?.duration || 0;
+      return notebook?.duration || 0;
     }
     
     // Calculate elapsed time since recording started
@@ -442,124 +421,14 @@ const NotebookDetail = ({
     return durationSeconds;
   };
   
-  const handleSaveNote = async () => {
-    // If recording is active, we need to handle recording stop first
-    if (isRecording) {
-      // No need for a separate confirmation dialog - just inform the user what's happening
-      setStatus("Stopping recording and saving notebook...");
-      
-      // Calculate duration before stopping recording
-      const currentDuration = calculateCurrentDuration();
-      
-      // Force stop recording via TranscriptionMic
-      setIsRecording(false);
-      
-      // Small delay to allow TranscriptionMic to properly close connections
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // If we don't have any content yet, don't save
-      if (!transcriptText.trim() && !noteText.trim()) {
-        setStatus("Nothing to save yet");
-        setTimeout(() => setStatus(""), 2000);
-        return;
-      }
-      
-      // Directly proceed to saving without additional confirmations
-      const notebookData = {
-        userId: userId,
-        noteId: lastSavedNoteId.current || transcript?._id || null,
-        title: title || `Note ${new Date().toLocaleDateString()}`,
-        noteText: noteText,
-        originalText: noteText, // For compatibility
-        text: noteText, // For compatibility
-        curTranscript: transcriptText || '', // Include current transcript
-        curSummary: '', // Clear summary since we're stopping mid-recording
-        date: new Date().toISOString(),
-        duration: currentDuration // Use calculated duration
-      };
-      
-      if (!userId) {
-        console.error("Cannot save note: No userId provided");
-        alert("Cannot save note: No user ID provided");
-        return;
-      }
-      
-      // Show saving indicator
-      setStatus("Saving notebook...");
-      
-      // Mark as recently saved
-      setRecentlySaved(true);
-      
-      try {
-        // Force stayOnPage to be false to ensure navigation
-        const noteId = await onSaveTranscript(notebookData, null, false);
-        
-        if (noteId) {
-          lastSavedNoteId.current = noteId;
-          // Navigation will happen automatically through onSaveTranscript
-        } else {
-          // In case of error, show a message
-          setStatus("Error saving notebook");
-          setTimeout(() => setStatus(""), 2000);
-        }
-      } catch (error) {
-        console.error("Error saving notebook:", error);
-        setStatus("Error saving notebook: " + error.message);
-        setTimeout(() => setStatus(""), 3000);
-      }
-      
-      return;
-    }
-    
-    // If we're not recording, handle normal save
-    
+  const handleManualSave = async () => {
     // If we just saved from stopping the recording and haven't changed anything, skip the save
     if (recentlySaved && !isRecording) {
-      // Just navigate back without saving again
-      onBackToList();
       return;
     }
     
-    // Save the current note without new transcription
-    const notebookData = {
-      userId: userId,
-      noteId: lastSavedNoteId.current || transcript?._id || null,
-      title: title || `Note ${new Date().toLocaleDateString()}`,
-      noteText: noteText,
-      originalText: noteText, // For compatibility
-      text: noteText, // For compatibility
-      curTranscript: transcriptText || '', // Include current transcript
-      curSummary: summaryText ? JSON.stringify({
-        summary: summaryText,
-        keywords: keywords || []
-      }) : '',
-      date: new Date().toISOString(),
-      duration: transcript?.duration || 0 // No duration for manual save
-    };
-    
-    if (!userId) {
-      console.error("Cannot save note: No userId provided");
-      alert("Cannot save note: No user ID provided");
-      return;
-    }
-    
-    // Show a temporary saving indicator
-    setStatus("Saving notebook...");
-    
-    // Mark as recently saved
-    setRecentlySaved(true);
-    
-    try {
-      // Force stayOnPage to be false to ensure navigation
-      const noteId = await onSaveTranscript(notebookData, null, false);
-      if (noteId) {
-        lastSavedNoteId.current = noteId;
-      }
-    } catch (error) {
-      console.error("Error saving notebook:", error);
-      setStatus("Error saving notebook: " + error.message);
-      setTimeout(() => setStatus(""), 3000);
-    }
+    // Save the current note
+    saveNotebook('notebook');
   };
 
   // Handle going back to the list - forcibly stop recording
@@ -576,6 +445,9 @@ const NotebookDetail = ({
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     
+    // Save the notebook before navigating away
+    saveNotebook('before home');
+
     // Navigate back to the list without saving
     onBackToList();
   };
@@ -651,10 +523,20 @@ const NotebookDetail = ({
   };
 
   return (
-    <div className="notebook-detail-container">
+    <motion.div 
+      className="notebook-detail-container"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       {/* Header row with title and navigation */}
       <div className="notebook-header">
-        <div className="notebook-title-section">
+        <motion.div 
+          className="notebook-title-section"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1, duration: 0.4 }}
+        >
           {isEditingTitle ? (
             <input 
               ref={titleInputRef}
@@ -676,9 +558,14 @@ const NotebookDetail = ({
             </h2>
           )}
           <div className="notebook-date">{getCurrentDateTime()}</div>
-        </div>
+        </motion.div>
         
-        <div className="notebook-actions">
+        <motion.div 
+          className="notebook-actions"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+        >
           <button 
             className="home-button" 
             onClick={handleBackToList}
@@ -688,29 +575,48 @@ const NotebookDetail = ({
           
           <button 
             className="save-button" 
-            onClick={handleSaveNote}
+            onClick={handleManualSave}
           >
             Save
           </button>
-        </div>
+        </motion.div>
       </div>
       
       {/* Main content area with two columns */}
-      <div className="notebook-content">
+      <motion.div 
+        className="notebook-content"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
         {/* Left column - Note taking area */}
-        <div className="note-column">
+        <motion.div 
+          className="note-column"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
+        >
           <textarea
             className="note-textarea"
             value={noteText}
             onChange={handleNoteChange}
             placeholder="Start typing your notes here..."
           />
-        </div>
+        </motion.div>
         
         {/* Right column - Transcription/Summary area */}
-        <div className="transcription-column">
+        <motion.div 
+          className="transcription-column"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.5, duration: 0.4 }}
+        >
           {/* Microphone component */}
-          <div className="microphone-container">
+          <motion.div 
+            className="microphone-container"
+            whileHover={{ y: -2, boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)" }}
+            transition={{ duration: 0.2 }}
+          >
             <TranscriptionMic
               onStatusChange={handleStatusChange}
               onTranscriptChange={handleTranscriptChange}
@@ -720,28 +626,39 @@ const NotebookDetail = ({
               setIsRecording={setIsRecording}
             />
             {status && (
-              <div className="transcription-status">{status}</div>
+              <motion.div 
+                className="transcription-status"
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                key={status}
+              >
+                {status}
+              </motion.div>
             )}
-          </div>
+          </motion.div>
           
           {/* Tabs for Transcript and Summary */}
           <div className="transcription-tabs">
-            <div 
+            <motion.div 
               className={`tab ${activeTab === 'transcript' ? 'active' : ''}`}
               onClick={() => handleTabChange('transcript')}
+              whileHover={activeTab !== 'transcript' ? { y: -2 } : {}}
+              whileTap={{ scale: 0.98 }}
             >
               Transcript
               {isRecording && <span className="recording-indicator"></span>}
-            </div>
+            </motion.div>
             
             {/* Only show the summary tab when NOT recording and we have transcript content */}
             {shouldShowSummaryTab ? (
-              <div 
+              <motion.div 
                 className={`tab ${activeTab === 'summary' ? 'active' : ''}`}
                 onClick={() => handleTabChange('summary')}
+                whileHover={activeTab !== 'summary' ? { y: -2 } : {}}
+                whileTap={{ scale: 0.98 }}
               >
                 Summary
-              </div>
+              </motion.div>
             ) : (
               hasTranscript && !isRecording && (
                 <div className="tab disabled">
@@ -752,126 +669,220 @@ const NotebookDetail = ({
           </div>
           
           {/* Transcription/Summary display area */}
-          <div className="tab-content">
-            {activeTab === 'transcript' && (
-              <div className="transcription-text-container">
-                <div className="transcription-header">
-                  <h3>Transcript</h3>
-                  <button 
-                    className="copy-button"
-                    onClick={() => handleCopy(transcriptText, 'transcript')}
-                    disabled={!transcriptText}
-                    title="Copy transcript to clipboard"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    {copyFeedback.type === 'transcript' && (
-                      <span className="copy-feedback">{copyFeedback.message}</span>
-                    )}
-                  </button>
-                </div>
-                <div className="transcription-text">
-                  {transcriptText || <span className="placeholder-text">Transcript will appear here...</span>}
-                </div>
-              </div>
-            )}
-            
-            {activeTab === 'summary' && !isRecording && (
-              <div className="summary-content">
-                {isSummaryLoading ? (
-                  <div className="summary-loading">
-                    <div className="spinner"></div>
-                    <p>Generating summary and keywords with Gemini AI...</p>
+          <motion.div 
+            className="tab-content"
+            layout
+            transition={{ duration: 0.3 }}
+          >
+            <AnimatePresence mode="wait">
+              {activeTab === 'transcript' && (
+                <motion.div 
+                  className="transcription-text-container"
+                  key="transcript"
+                  variants={fadeIn}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                >
+                  <div className="transcription-header">
+                    <h3>Transcript</h3>
+                    <motion.button 
+                      className="copy-button"
+                      onClick={() => handleCopy(transcriptText, 'transcript')}
+                      disabled={!transcriptText}
+                      title="Copy transcript to clipboard"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                      {copyFeedback.type === 'transcript' && (
+                        <motion.span 
+                          className="copy-feedback"
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                        >
+                          {copyFeedback.message}
+                        </motion.span>
+                      )}
+                    </motion.button>
                   </div>
-                ) : summaryError ? (
-                  <div className="summary-error">
-                    <p>{summaryError}</p>
-                    <button onClick={handleRegenerateSummary}>Try Again</button>
-        </div>
-      ) : (
-                  <>
-                    {keywords && keywords.length > 0 && (
-                      <div className="keywords-section">
+                  <div className="transcription-text">
+                    {transcriptText || <span className="placeholder-text">Transcript will appear here...</span>}
+                  </div>
+                </motion.div>
+              )}
+              
+              {activeTab === 'summary' && !isRecording && (
+                <motion.div 
+                  className="summary-content"
+                  key="summary"
+                  variants={fadeIn}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                >
+                  {isSummaryLoading ? (
+                    <motion.div 
+                      className="summary-loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <motion.div 
+                        className="spinner"
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                      />
+                      <p>Generating summary and keywords with Gemini AI...</p>
+                    </motion.div>
+                  ) : summaryError ? (
+                    <motion.div 
+                      className="summary-error"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <p>{summaryError}</p>
+                      <motion.button 
+                        onClick={handleRegenerateSummary}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        Try Again
+                      </motion.button>
+                    </motion.div>
+                  ) : (
+                    <>
+                      {keywords && keywords.length > 0 && (
+                        <motion.div 
+                          className="keywords-section"
+                          variants={tabVariants}
+                          initial="hidden"
+                          animate="visible"
+                          transition={{ delay: 0.1 }}
+                        >
+                          <div className="section-header">
+                            <h3>Keywords</h3>
+                            <motion.button 
+                              className="copy-button"
+                              onClick={() => handleCopy(keywords.join(', '), 'keywords')}
+                              disabled={!keywords.length}
+                              title="Copy keywords to clipboard"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                              </svg>
+                              {copyFeedback.type === 'keywords' && (
+                                <motion.span 
+                                  className="copy-feedback"
+                                  initial={{ opacity: 0, y: 5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0 }}
+                                >
+                                  {copyFeedback.message}
+                                </motion.span>
+                              )}
+                            </motion.button>
+                          </div>
+                          <div className="keywords-list">
+                            {keywords.map((keyword, index) => (
+                              <motion.button 
+                                key={index} 
+                                className="keyword-tag clickable"
+                                onClick={() => openPerplexityWithKeyword(keyword)}
+                                title={`Click to search for "${keyword}" on Perplexity AI`}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.05 * index }}
+                                whileHover={{ 
+                                  y: -4, 
+                                  boxShadow: "0 6px 10px rgba(80, 86, 224, 0.2)" 
+                                }}
+                                whileTap={{ y: 0, boxShadow: "none" }}
+                              >
+                                {keyword}
+                                <span className="keyword-icon">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                  </svg>
+                                </span>
+                              </motion.button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                      
+                      <motion.div 
+                        className="summary-section"
+                        variants={tabVariants}
+                        initial="hidden"
+                        animate="visible"
+                        transition={{ delay: 0.2 }}
+                      >
                         <div className="section-header">
-                          <h3>Keywords</h3>
-                          <button 
+                          <h3>Summary</h3>
+                          <motion.button 
                             className="copy-button"
-                            onClick={() => handleCopy(keywords.join(', '), 'keywords')}
-                            disabled={!keywords.length}
-                            title="Copy keywords to clipboard"
+                            onClick={() => handleCopy(summaryText, 'summary')}
+                            disabled={!summaryText}
+                            title="Copy summary to clipboard"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                             </svg>
-                            {copyFeedback.type === 'keywords' && (
-                              <span className="copy-feedback">{copyFeedback.message}</span>
+                            {copyFeedback.type === 'summary' && (
+                              <motion.span 
+                                className="copy-feedback"
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                              >
+                                {copyFeedback.message}
+                              </motion.span>
                             )}
-                          </button>
+                          </motion.button>
                         </div>
-                        <div className="keywords-list">
-                          {keywords.map((keyword, index) => (
-                            <button 
-                              key={index} 
-                              className="keyword-tag clickable"
-                              onClick={() => openPerplexityWithKeyword(keyword)}
-                              title={`Click to search for "${keyword}" on Perplexity AI`}
-                            >
-                              {keyword}
-                              <span className="keyword-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                                  <polyline points="15 3 21 3 21 9"></polyline>
-                                  <line x1="10" y1="14" x2="21" y2="3"></line>
-                                </svg>
-              </span>
-                            </button>
-                          ))}
+                        <div className="summary-text">
+                          {summaryText || <span className="placeholder-text">No summary available. Click "Generate" to create one.</span>}
                         </div>
-                      </div>
-                    )}
-                    
-                    <div className="summary-section">
-                      <div className="section-header">
-                        <h3>Summary</h3>
-                        <button 
-                          className="copy-button"
-                          onClick={() => handleCopy(summaryText, 'summary')}
-                          disabled={!summaryText}
-                          title="Copy summary to clipboard"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                          </svg>
-                          {copyFeedback.type === 'summary' && (
-                            <span className="copy-feedback">{copyFeedback.message}</span>
-                          )}
-                        </button>
-            </div>
-                      <div className="summary-text">
-                        {summaryText || <span className="placeholder-text">No summary available. Click "Generate" to create one.</span>}
-            </div>
-          </div>
-          
-                    <div className="summary-actions">
-                      <button 
-                        onClick={handleRegenerateSummary}
-                        className="regenerate-button"
+                      </motion.div>
+                      
+                      <motion.div 
+                        className="summary-actions"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.4 }}
                       >
-                        Regenerate
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+                        <motion.button 
+                          onClick={handleRegenerateSummary}
+                          className="regenerate-button"
+                          whileHover={{ y: -2, boxShadow: "0 6px 12px rgba(80, 86, 224, 0.25)" }}
+                          whileTap={{ y: 0, boxShadow: "0 2px 4px rgba(80, 86, 224, 0.15)" }}
+                        >
+                          Regenerate
+                        </motion.button>
+                      </motion.div>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 };
 

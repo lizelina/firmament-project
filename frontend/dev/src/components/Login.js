@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import './Login.css';
 
 // Helper function to generate a unique ID
@@ -66,12 +67,38 @@ const Login = ({ onLoginSuccess, onSwitchToRegister }) => {
 
   return (
     <div className="login-container">
-      <div className="login-form-wrapper">
-        <h1>Speech Transcription Login</h1>
+      <motion.div 
+        className="login-form-wrapper"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <motion.h1
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+        >
+          Speech Transcription Login
+        </motion.h1>
+        
         <form className="login-form" onSubmit={handleSubmit}>
-          {error && <div className="error-message">{error}</div>}
+          {error && (
+            <motion.div 
+              className="error-message"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {error}
+            </motion.div>
+          )}
           
-          <div className="form-group">
+          <motion.div 
+            className="form-group"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+          >
             <label htmlFor="email">Email</label>
             <input
               type="email"
@@ -82,9 +109,14 @@ const Login = ({ onLoginSuccess, onSwitchToRegister }) => {
               placeholder="Enter your email"
               autoComplete="email"
             />
-          </div>
+          </motion.div>
           
-          <div className="form-group">
+          <motion.div 
+            className="form-group"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.4 }}
+          >
             <label htmlFor="password">Password</label>
             <input
               type="password"
@@ -95,24 +127,34 @@ const Login = ({ onLoginSuccess, onSwitchToRegister }) => {
               placeholder="Enter your password"
               autoComplete="current-password"
             />
-          </div>
+          </motion.div>
           
-          <button 
+          <motion.button 
             type="submit" 
             className="login-button" 
             disabled={loading}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.4 }}
+            whileHover={{ y: -2, boxShadow: "0 6px 12px rgba(80, 86, 224, 0.25)" }}
+            whileTap={{ y: 0, boxShadow: "0 2px 4px rgba(80, 86, 224, 0.15)" }}
           >
             {loading ? 'Logging in...' : 'Login'}
-          </button>
+          </motion.button>
           
-          <div className="login-help">
-            <p>Demo account: john.doe@example.com / 123456</p>
+          <motion.div 
+            className="login-help"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6, duration: 0.4 }}
+          >
+            <p>Demo account: a@firmament / 123456</p>
             <p>Don't have an account? <a href="#" onClick={(e) => { e.preventDefault(); onSwitchToRegister(); }}>Register</a></p>
-          </div>
+          </motion.div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };
 
-export default Login; 
+export default Login;
