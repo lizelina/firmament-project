@@ -36,8 +36,11 @@ const TranscriptionMic = ({
   onStatusChange, 
   onTranscriptChange, 
   userId, 
-  onCompleteTranscript
+  onCompleteTranscript,
+  isRecording,
+  setIsRecording
 }) => {
+  // Internal recording state
   const [recording, setRecording] = useState(false);
   const [connected, setConnected] = useState(false);
   const [deepgramConnected, setDeepgramConnected] = useState(false);
@@ -59,6 +62,20 @@ const TranscriptionMic = ({
   useEffect(() => {
     debugLog("Recording state is now:", recording);
   }, [recording]);
+
+  // Respond to changes in isRecording prop from parent
+  useEffect(() => {
+    // If parent sets isRecording to false while we're recording, forcibly stop
+    if (isRecording === false && recording === true) {
+      debugLog("Parent forced recording stop");
+      stopRecording(false); // Not silent
+    }
+    // If parent sets isRecording to true while we're not recording, start
+    else if (isRecording === true && recording === false) {
+      debugLog("Parent initiated recording start");
+      startRecording();
+    }
+  }, [isRecording]);
 
   // Clean up resources when component unmounts
   useEffect(() => {
@@ -217,7 +234,7 @@ const TranscriptionMic = ({
           const spacer = currentTranscript && !currentTranscript.endsWith(' ') ? ' ' : '';
           accumulatedTranscriptRef.current = currentTranscript + spacer + data.transcription;
           
-          // Always update the transcript in the parent, regardless of recording state
+          // Always update the transcript in the parent, KEEP CURRENT RECORDING STATE
           if (onTranscriptChange) {
             onTranscriptChange(accumulatedTranscriptRef.current, recording);
           }
@@ -382,11 +399,22 @@ const TranscriptionMic = ({
       
       microphone.onstop = () => {
         setRecording(false);
+        
+        // Update parent's recording state
+        if (setIsRecording) {
+          setIsRecording(false);
+        }
       };
       
       microphone.onerror = (event) => {
         console.error("Microphone error:", event.error);
         setRecording(false);
+        
+        // Update parent's recording state
+        if (setIsRecording) {
+          setIsRecording(false);
+        }
+        
         onStatusChange("Microphone error: " + event.error);
       };
       
@@ -411,8 +439,14 @@ const TranscriptionMic = ({
       // IMPORTANT: Set recording state to true BEFORE starting the recording process
       setRecording(true);
       
-      // Notify parent component immediately
+      // Update parent's recording state
+      if (setIsRecording) {
+        setIsRecording(true);
+      }
+      
+      // Notify parent component immediately with empty transcript
       if (onTranscriptChange) {
+        debugLog("Notifying parent that recording is starting with empty transcript");
         onTranscriptChange('', true); // true = recording is active
       }
       
@@ -446,6 +480,11 @@ const TranscriptionMic = ({
     } catch (error) {
       debugLog("Error starting recording:", error);
       setRecording(false);
+      
+      // Update parent's recording state
+      if (setIsRecording) {
+        setIsRecording(false);
+      }
       
       // Notify parent of the error and recording state change
       if (onTranscriptChange) {
@@ -487,6 +526,11 @@ const TranscriptionMic = ({
       
       // IMPORTANT: Set recording state to false BEFORE stopping the recording process
       setRecording(false);
+      
+      // Update parent's recording state
+      if (setIsRecording) {
+        setIsRecording(false);
+      }
       
       // Notify parent component immediately
       if (onTranscriptChange) {

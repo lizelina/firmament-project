@@ -93,7 +93,8 @@ const NotebookDetail = ({
     console.log("Transcript updated:", { 
       textLength: newTranscript.length,
       recordingStatus,
-      hasContent: newTranscript && newTranscript.trim().length > 0
+      hasContent: newTranscript && newTranscript.trim().length > 0,
+      currentIsRecording: isRecording
     });
     
     // Always update the transcript text state
@@ -112,9 +113,10 @@ const NotebookDetail = ({
       setRecentlySaved(false);
     }
     
-    // IMPORTANT: Always update recording state if provided
-    if (recordingStatus !== undefined) {
-      console.log("✅ Updating recording state from transcript:", recordingStatus);
+    // IMPORTANT: Only update recording state if we're sure it should change
+    // This prevents incorrect state changes during transcript updates
+    if (recordingStatus !== undefined && recordingStatus !== isRecording) {
+      console.log(`✅ Updating recording state from ${isRecording} to ${recordingStatus}`);
       setIsRecording(recordingStatus);
     }
   };
@@ -169,7 +171,19 @@ const NotebookDetail = ({
     setTitle(e.target.value);
   };
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
+    // First, stop recording if active
+    if (isRecording) {
+      // Force stop recording via TranscriptionMic
+      setIsRecording(false);
+      
+      // Show status while saving
+      setStatus("Stopping recording and saving notebook...");
+      
+      // Small delay to allow TranscriptionMic to properly close connections
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
     // If we just saved from stopping the recording and haven't changed anything, skip the save
     if (recentlySaved && !isRecording) {
       // Just navigate back without saving again
@@ -185,7 +199,7 @@ const NotebookDetail = ({
       noteText: noteText,
       originalText: noteText, // For compatibility
       text: noteText, // For compatibility
-      curTranscript: isRecording ? '' : transcriptText || '', // Only include transcript if not recording
+      curTranscript: transcriptText || '', // Include current transcript
       curSummary: '',
       date: new Date().toISOString(),
       duration: transcript?.duration || 0 // No duration for manual save
@@ -197,11 +211,6 @@ const NotebookDetail = ({
       return;
     }
     
-    // Add a user-friendly message based on recording state
-    let successMessage = isRecording ? 
-      "Note saved. Transcription still in progress and will be saved when complete." : 
-      "Note and transcript saved successfully.";
-    
     // Show a temporary saving indicator
     setStatus("Saving notebook...");
     
@@ -209,11 +218,29 @@ const NotebookDetail = ({
     setRecentlySaved(true);
     
     // Force stayOnPage to be false to ensure navigation
-    onSaveTranscript(notebookData, successMessage, false).then(noteId => {
+    onSaveTranscript(notebookData, "Note and transcript saved successfully.", false).then(noteId => {
       if (noteId) {
         lastSavedNoteId.current = noteId;
       }
     });
+  };
+
+  // Handle going back to the list - forcibly stop recording
+  const handleBackToList = async () => {
+    // If currently recording, force stop first
+    if (isRecording) {
+      // Force stop recording via TranscriptionMic
+      setIsRecording(false);
+      
+      // Show status while stopping
+      setStatus("Stopping recording...");
+      
+      // Small delay to allow TranscriptionMic to properly close connections
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    // Navigate back to the list without saving
+    onBackToList();
   };
   
   // IMPORTANT: Check if we should show the summary tab
@@ -221,6 +248,13 @@ const NotebookDetail = ({
   // 1. Not recording
   // 2. Has transcript text
   const shouldShowSummaryTab = !isRecording && hasTranscript && transcriptText.trim() !== '';
+  
+  console.log("Summary tab visibility check:", {
+    isRecording,
+    hasTranscript,
+    transcriptLength: transcriptText?.length || 0,
+    shouldShow: shouldShowSummaryTab
+  });
   
   // Handle tab change - only allow switching to summary when not recording
   const handleTabChange = (tab) => {
@@ -254,8 +288,7 @@ const NotebookDetail = ({
         <div className="notebook-actions">
           <button 
             className="home-button" 
-            onClick={onBackToList}
-            disabled={isRecording}
+            onClick={handleBackToList}
           >
             Home
           </button>
@@ -263,7 +296,6 @@ const NotebookDetail = ({
           <button 
             className="save-button" 
             onClick={handleSaveNote}
-            disabled={isRecording}
           >
             Save
           </button>
