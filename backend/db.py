@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 # MongoDB connection string
 # Original MongoDB Atlas connection
-# MONGO_URI = os.getenv('MONGO_URI', 'mongodb+srv://root:123qweasd@fimament-a.p9kidca.mongodb.net/')
-# DB_NAME = os.getenv('DB_NAME', 'firmament')
+MONGO_URI = os.getenv('MONGO_URI', 'mongodb+srv://root:123qweasd@fimament-a.p9kidca.mongodb.net/')
+DB_NAME = os.getenv('DB_NAME', 'firmament')
 
 # Local MongoDB connection
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
-DB_NAME = os.getenv('DB_NAME', 'firmament')
+# MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
+# DB_NAME = os.getenv('DB_NAME', 'firmament')
 
 # Initialize MongoDB client
 try:
