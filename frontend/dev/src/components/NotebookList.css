@@ -122,6 +122,10 @@
   margin-top: 16px;
 }
 
+.footer-spacer {
+  flex-grow: 1;
+}
+
 .delete-notebook-button {
   background-color: transparent;
   border: none;
@@ -133,6 +137,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: auto;
 }
 
 .delete-notebook-button:hover {

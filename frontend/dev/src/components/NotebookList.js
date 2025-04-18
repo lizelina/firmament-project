@@ -98,13 +98,17 @@ const NotebookList = ({
                   </span>
                 </div>
                 <p className="notebook-preview">
-                  {((notebook.noteText || notebook.originalText || notebook.text || '').substring(0, 100))}
-                  {((notebook.noteText || notebook.originalText || notebook.text || '').length > 100 ? '...' : '')}
+                  {((notebook.noteText || '').substring(0, 100))}
+                  {((notebook.noteText || '').length > 100 ? '...' : '')}
                 </p>
                 <div className="notebook-item-footer">
-                  <span className="notebook-duration">
-                    Duration: {formatDuration(notebook.duration)}
-                  </span>
+                  {notebook.curTranscript && notebook.curTranscript.trim() !== '' && (
+                    <span className="notebook-duration">
+                      Duration: {formatDuration(notebook.duration)}
+                    </span>
+                  )}
+                  
+                  <div className="footer-spacer"></div>
                   
                   <motion.button 
                     className="delete-notebook-button" 
