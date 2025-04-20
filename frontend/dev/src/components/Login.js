@@ -19,7 +19,7 @@ const Login = ({ onLoginSuccess, onSwitchToRegister }) => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/login', {
+      const response = await fetch('https://firmament-api.onrender.com/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -148,7 +148,7 @@ const Login = ({ onLoginSuccess, onSwitchToRegister }) => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.4 }}
           >
-            <p>Demo account: a@firmament / 123456</p>
+            <p>Demo account: welcome@firmament.com / 123456</p>
             <p>Don't have an account? <a href="#" onClick={(e) => { e.preventDefault(); onSwitchToRegister(); }}>Register</a></p>
           </motion.div>
         </form>

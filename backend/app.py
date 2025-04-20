@@ -24,7 +24,16 @@ load_dotenv()
 def create_app():
     """Application factory function"""
     app = Flask("app_http")
-    CORS(app)  # Enable CORS for all routes
+    # Enable CORS for all routes with specific origins
+    CORS(app, resources={r"/*": {"origins": [
+        "http://127.0.0.1:8000", 
+        "http://localhost:8000", 
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "https://firmament-frontend.vercel.app",  # Add Vercel domain explicitly
+        "https://*", 
+        "http://*"
+    ]}})
     
     @app.route('/')
     def index():

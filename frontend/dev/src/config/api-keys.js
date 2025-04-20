@@ -1,10 +1,10 @@
 // This file contains API keys for external services
-// In a production environment, these would not be stored in the frontend
-// but would be handled securely on the backend
+// In a production environment, these are loaded from environment variables
+// for better security
 
 // Google Gemini API Key
 // For more information, see: https://ai.google.dev/tutorials/javascript_quickstart
-export const GEMINI_API_KEY = 'AIzaSyD_NVy66OI-UO66RUUDwgY9VCyYoTnL3ow';
+export const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || '';
 
 // Available models:
 // - gemini-2.0-flash: Latest flash model, fast with improved capabilities (recommended)

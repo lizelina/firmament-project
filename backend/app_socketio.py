@@ -29,14 +29,30 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app_socketio = Flask("app_socketio")
-# Enable CORS for all routes
-CORS(app_socketio, resources={r"/*": {"origins": "*"}})
+# Enable CORS for all routes with specific origins
+CORS(app_socketio, resources={r"/*": {"origins": [
+    "http://127.0.0.1:8000", 
+    "http://localhost:8000", 
+    "http://localhost:3000", 
+    "http://127.0.0.1:3000",
+    "https://firmament-frontend.vercel.app",  # Add Vercel domain explicitly
+    "https://*", 
+    "http://*"
+]}})
 
-# Allow CORS from the main app and any production URLs
+# Allow CORS from the main app and production URLs
 # Add socket.io config for better connection stability
 socketio = SocketIO(
     app_socketio, 
-    cors_allowed_origins=['http://127.0.0.1:8000', 'http://localhost:8000', 'http://localhost:3000', 'http://127.0.0.1:3000', 'https://*', 'http://*'],
+    cors_allowed_origins=[
+        'http://127.0.0.1:8000', 
+        'http://localhost:8000', 
+        'http://localhost:3000', 
+        'http://127.0.0.1:3000', 
+        'https://firmament-frontend.vercel.app',  # Add Vercel domain explicitly
+        'https://*', 
+        'http://*'
+    ],
     binary=True,  # Important for binary audio data
     ping_timeout=60,  # Increase ping timeout to 60 seconds (default is 5)
     ping_interval=25,  # Increase ping interval to 25 seconds (default is 25)
@@ -68,6 +84,9 @@ connection_activity = {}
 
 # When did we last print connection stats
 last_stats_time = time.time()
+
+logger.info(f"Deepgram API Key first 5 chars: {API_KEY[:5]}...")
+logger.info(f"Deepgram API Key length: {len(API_KEY)}")
 
 def initialize_deepgram_connection(session_id):
     try:

@@ -1,0 +1,28 @@
+services:
+  # Main Flask API service
+  - type: web
+    name: firmament-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: DB_NAME
+        value: firmament
+      - key: DEEPGRAM_API_KEY
+        sync: false
+
+  # Socket.IO service for real-time audio transcription
+  - type: web
+    name: firmament-socketio
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app_socketio.py
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: DB_NAME
+        value: firmament
+      - key: DEEPGRAM_API_KEY
+        sync: false 

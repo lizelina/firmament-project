@@ -134,8 +134,8 @@ const TranscriptionMic = ({
         socketRef.current = null;
       }
 
-      const socketPort = 5001;
-      const socketUrl = `http://localhost:${socketPort}`;
+      // Use the Render-deployed socketio server
+      const socketUrl = `https://firmament-socketio.onrender.com`;
       
       debugLog(`Initializing socket connection to ${socketUrl} with userId ${ephemeralUserId}`);
       
