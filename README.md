@@ -36,13 +36,15 @@ Due to browser limitations on simultaneous audio input/output handling:
 - Any scenario where microphone recording and video playback happen in the same browser instance
 
 ![Compatibility Issue Example](images/transcription-compatibility-issue.png)
-*Example: Attempting to use transcription alongside YouTube in the same browser results in "No Transcription"*
+*Example: Attempting to use transcription alongside YouTube in the **same** browser results in "No Transcription"*
 
 ### ✅ Supported Scenarios
 - **Multi-Browser Solution**: Use Chrome for the transcription app and Edge for video playback
-- **App + Music Streaming**: Using the transcription app while playing music in Spotify (separate application)
+- **App + Podcast Streaming**: Using the transcription app while playing Podcast in Spotify (separate application)
 - **Cross-Device**: Recording on your computer while playing videos on a separate device
-- **Audio-Only Content**: The app works with Spotify web player and similar audio-only services
+
+![Worked Example](images/worked-example.png)
+*Example: Successfully transcribing audio using **Chrome** for the app and **Spotify** for a podcast.*
 
 ### 💡 Recommended Setup
 - For meetings/lectures: Use our app in Chrome with no other audio sources
