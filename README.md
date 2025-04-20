@@ -2,6 +2,14 @@
 
 A full-stack application for real-time speech transcription using Deepgram's speech-to-text API. The app features user authentication, persistent sessions, and high-quality transcription.
 
+## Live Demo
+
+**Live Demo:** [https://firmament-frontend.vercel.app](https://firmament-frontend.vercel.app)
+
+**Test Account:**
+- Email: welcome@firmament.com
+- Password: 123456
+
 ## Features
 
 - Real-time speech-to-text transcription
@@ -16,6 +24,7 @@ A full-stack application for real-time speech transcription using Deepgram's spe
 - **Backend**: Flask, Flask-SocketIO, Deepgram API
 - **Frontend**: React.js
 - **Authentication**: Simple user authentication
+- **Deployment**: Vercel (frontend), Render (backend)
 
 ## Installation
 
@@ -69,16 +78,9 @@ A full-stack application for real-time speech transcription using Deepgram's spe
 
 3. Access the application at http://localhost:3000
 
-## Login Information
-
-To access the application, use the following credentials:
-
-- **Username**: root
-- **Password**: 123456
-
 ## Usage
 
-1. Log in with the credentials above
+1. Log in with the test credentials (welcome@firmament.com / 123456)
 2. Click the microphone button to start recording
 3. Speak into your microphone to see real-time transcription
 4. Click the microphone button again to stop recording
@@ -91,6 +93,13 @@ The application consists of three main components:
 1. **HTTP Server (app.py)**: Handles authentication and serves static content
 2. **WebSocket Server (app_socketio.py)**: Manages real-time audio streaming and Deepgram integration
 3. **React Frontend**: Provides the user interface for login, audio recording, and transcription display
+
+## Deployment
+
+The application is deployed using:
+- **Frontend**: Vercel ([https://firmament-frontend.vercel.app](https://firmament-frontend.vercel.app))
+- **Backend API**: Render (https://firmament-api.onrender.com)
+- **WebSocket Server**: Render (https://firmament-socketio.onrender.com)
 
 ## Session Management
 
