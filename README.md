@@ -61,7 +61,7 @@ Due to browser limitations on simultaneous audio input/output handling:
 
 ### Database Setup
 
-Under normal circumstances, no setup is required; however, NUS Wi‑Fi blocks access to MongoDB Atlas. You can either use a mobile hotspot for internet access or connect to a local MongoDB instance.
+Under normal circumstances, no setup is required; however, **NUS Wi‑Fi** blocks access to MongoDB Atlas. You can either use a mobile hotspot for internet access or connect to a local MongoDB instance.
 
 ### Backend Setup
 
