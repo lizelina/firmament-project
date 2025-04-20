@@ -1,6 +1,6 @@
-# Real-time Speech Transcription App
+# Real-time Transcription Assisted Notetaking App
 
-A full-stack application for real-time speech transcription using Deepgram's speech-to-text API. The app features user authentication, persistent sessions, and high-quality transcription.
+A full-stack application for real-time speech transcription using Deepgram's speech-to-text API, assisting users in notetaking. The app features user authentication, persistent sessions, and high-quality transcription.
 
 ## Live Demo
 
@@ -59,6 +59,10 @@ Due to browser limitations on simultaneous audio input/output handling:
 - Node.js 14+
 - Deepgram API key
 
+### Database Setup
+
+Under normal circumstances, no setup is required; however, NUS Wi‑Fi blocks access to MongoDB Atlas. You can either use a mobile hotspot for internet access or connect to a local MongoDB instance.
+
 ### Backend Setup
 
 1. Clone the repository
@@ -84,6 +88,8 @@ Due to browser limitations on simultaneous audio input/output handling:
 
 ## Running the Application
 
+### Option 1: Manual Start
+
 1. Start the backend servers:
    ```
    # Terminal 1 - HTTP Server
@@ -103,9 +109,26 @@ Due to browser limitations on simultaneous audio input/output handling:
 
 3. Access the application at http://localhost:3000
 
+### Option 2: Quick Launch (Windows)
+
+For Windows users, we provide batch files for quick startup and shutdown:
+
+1. **Starting all services**: 
+   Simply double-click `run_app.bat` in the root directory, which will:
+   - Start the Flask backend server
+   - Start the Socket.IO server
+   - Launch the React frontend
+
+2. **Shutting down servers**:
+   When you're done, use `kill_socket_server.bat` to terminate:
+   - The Flask server running on port 8000
+   - The Socket.IO server running on port 5001
+
+These batch files streamline the development workflow and ensure all components are properly started and stopped.
+
 ## Usage
 
-1. Log in with the test credentials (welcome@firmament.com / 123456)
+1. Log in with the test credentials (a@firmament / 123456)
 2. Click the microphone button to start recording
 3. Speak into your microphone to see real-time transcription
 4. Click the microphone button again to stop recording
