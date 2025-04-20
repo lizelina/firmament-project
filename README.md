@@ -7,7 +7,7 @@ A full-stack application for real-time speech transcription using Deepgram's spe
 **Live Demo:** [https://firmament-frontend.vercel.app](https://firmament-frontend.vercel.app)
 
 **Test Account:**
-- Email: welcome@firmament.com
+- Email: a@firmament
 - Password: 123456
 
 ## Features
