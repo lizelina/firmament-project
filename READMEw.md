@@ -26,6 +26,29 @@ A full-stack application for real-time speech transcription using Deepgram's spe
 - **Authentication**: Simple user authentication
 - **Deployment**: Vercel (frontend), Render (backend)
 
+## ⚠️ Audio Compatibility Guide ⚠️
+
+Due to browser limitations on simultaneous audio input/output handling:
+
+### ❌ Not Supported (Will Not Work)
+- Using the same browser to record audio **AND** play video content (YouTube, Netflix, etc.)
+- Running the transcription app alongside any video streaming service in the same browser
+- Any scenario where microphone recording and video playback happen in the same browser instance
+
+![Compatibility Issue Example](images/transcription-compatibility-issue.png)
+*Example: Attempting to use transcription alongside YouTube in the same browser results in "No Transcription"*
+
+### ✅ Supported Scenarios
+- **Multi-Browser Solution**: Use Chrome for the transcription app and Edge for video playback
+- **App + Music Streaming**: Using the transcription app while playing music in Spotify (separate application)
+- **Cross-Device**: Recording on your computer while playing videos on a separate device
+- **Audio-Only Content**: The app works with Spotify web player and similar audio-only services
+
+### 💡 Recommended Setup
+- For meetings/lectures: Use our app in Chrome with no other audio sources
+- For transcribing videos: Use two browsers (e.g., Chrome for our app, Firefox for videos)
+- For podcast transcription: Use our app alongside the Spotify desktop application
+
 ## Installation
 
 ### Prerequisites
@@ -119,6 +142,7 @@ If you encounter issues with transcription:
 3. Verify both backend servers are running
 4. Check the browser console for errors
 5. Examine the server logs for WebSocket or Deepgram errors
+6. **Audio Not Transcribing?** 🔊 Make sure you're not playing videos in the same browser (see [Audio Compatibility Guide](#️-audio-compatibility-guide-️) above)
 
 ## License
 
